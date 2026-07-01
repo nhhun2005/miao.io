@@ -1,4 +1,4 @@
-.PHONY: frontend-install frontend-dev frontend-build frontend-lint backend-test backend-dev compose-up compose-down check-ids
+.PHONY: frontend-install frontend-dev frontend-build frontend-lint frontend-test backend-test backend-dev compose-up compose-down check-ids load-test
 
 frontend-install:
 	cd frontend && npm install
@@ -11,6 +11,9 @@ frontend-build:
 
 frontend-lint:
 	cd frontend && npm run lint
+
+frontend-test:
+	cd frontend && npm run test
 
 backend-test:
 	docker run --rm -v "$(PWD):/app" -v mimope-maven-cache:/root/.m2 -w /app/backend maven:3.9-eclipse-temurin-17 mvn test
@@ -26,3 +29,6 @@ compose-down:
 
 check-ids:
 	bash scripts/check-id-consistency.sh
+
+load-test:
+	node scripts/load-test.mjs

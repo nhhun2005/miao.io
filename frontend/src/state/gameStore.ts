@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { GridCellDebug } from "../network/protocol";
+import type { EvolutionOption, GridCellDebug } from "../network/protocol";
 
 /** Minimal player data received in snapshots. */
 export interface PlayerSnapshot {
@@ -13,6 +13,7 @@ export interface PlayerSnapshot {
   health: number;
   maxHealth: number;
   xp: number;
+  abilityCooldownTicks: number;
 }
 
 /** Minimal food data received in snapshots. */
@@ -38,6 +39,8 @@ export interface GameState {
   gridDebug: GridCellDebug[] | null;
   /** Whether grid debug overlay is enabled. */
   showGridDebug: boolean;
+  /** Evolution options currently available to the local player. */
+  evolutionOptions: EvolutionOption[];
 
   setLocalPlayerId: (id: string) => void;
   updateSnapshot: (
@@ -48,6 +51,8 @@ export interface GameState {
     gridDebug?: GridCellDebug[],
   ) => void;
   setShowGridDebug: (show: boolean) => void;
+  setEvolutionOptions: (options: EvolutionOption[]) => void;
+  clearEvolutionOptions: () => void;
   reset: () => void;
 }
 
@@ -59,6 +64,7 @@ const initialState = {
   lastSnapshotTick: 0,
   gridDebug: null as GridCellDebug[] | null,
   showGridDebug: false,
+  evolutionOptions: [] as EvolutionOption[],
 };
 
 export const useGameStore = create<GameState>((set) => ({
@@ -76,6 +82,10 @@ export const useGameStore = create<GameState>((set) => ({
     }),
 
   setShowGridDebug: (show) => set({ showGridDebug: show }),
+
+  setEvolutionOptions: (options) => set({ evolutionOptions: options }),
+
+  clearEvolutionOptions: () => set({ evolutionOptions: [] }),
 
   reset: () => set({ ...initialState }),
 }));

@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 import { useUIStore } from '../../state/uiStore';
-import { useGameStore } from '../../state/gameStore';
 import { Panel } from '../../ui';
 import { GameConnection } from '../../network/GameConnection';
 

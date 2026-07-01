@@ -243,115 +243,115 @@ Recommended default decisions:
 
 ## Phase 12: Evolution System
 
-- [ ] Define animal tiers.
-- [ ] Define XP thresholds.
-- [ ] Define evolution paths.
-- [ ] Send evolution options when player reaches threshold.
-- [ ] Display evolution modal in React.
-- [ ] Send selected evolution to backend.
-- [ ] Validate evolution eligibility server-side.
-- [ ] Update player animal, radius, speed, and health.
-- [ ] Update frontend sprite after evolution.
-- [ ] Add evolution visual effect.
-- [ ] Add tests for evolution rules.
+- [x] Define animal tiers.
+- [x] Define XP thresholds.
+- [x] Define evolution paths.
+- [x] Send evolution options when player reaches threshold.
+- [x] Display evolution modal in React.
+- [x] Send selected evolution to backend.
+- [x] Validate evolution eligibility server-side.
+- [x] Update player animal, radius, speed, and health.
+- [x] Update frontend sprite after evolution.
+- [x] Add evolution visual effect.
+- [x] Add tests for evolution rules.
 
 ---
 
 ## Phase 13: Predation, Damage, And Death
 
-- [ ] Define edible animal relationships.
-- [ ] Add player-vs-player collision checks.
-- [ ] Determine predator/prey outcomes.
-- [ ] Add damage or instant-eat rules.
-- [ ] Award XP for eating players.
-- [ ] Handle death server-side.
-- [ ] Send death message to victim.
-- [ ] Remove dead player entity or mark as dead.
-- [ ] Show death screen on frontend.
-- [ ] Add respawn flow.
-- [ ] Add kill event to snapshot.
-- [ ] Add tests for predation rules.
+- [x] Define edible animal relationships.
+- [x] Add player-vs-player collision checks.
+- [x] Determine predator/prey outcomes.
+- [x] Add damage or instant-eat rules.
+- [x] Award XP for eating players.
+- [x] Handle death server-side.
+- [x] Send death message to victim.
+- [x] Remove dead player entity or mark as dead.
+- [x] Show death screen on frontend.
+- [x] Add respawn flow.
+- [x] Add kill event to snapshot.
+- [x] Add tests for predation rules.
 
 ---
 
 ## Phase 14: Abilities
 
-- [ ] Define ability model.
-- [ ] Add cooldown tracking.
-- [ ] Add first simple ability, such as dash or claw.
-- [ ] Validate ability use server-side.
-- [ ] Apply ability effects in game loop.
-- [ ] Broadcast ability events.
-- [ ] Render ability effect in PixiJS.
-- [ ] Show cooldown in HUD.
-- [ ] Add tests for cooldown and effect rules.
+- [x] Define ability model.
+- [x] Add cooldown tracking.
+- [x] Add first simple ability, such as dash or claw.
+- [x] Validate ability use server-side.
+- [x] Apply ability effects in game loop.
+- [x] Broadcast ability events.
+- [x] Render ability effect in PixiJS.
+- [x] Show cooldown in HUD.
+- [x] Add tests for cooldown and effect rules.
 
 ---
 
 ## Phase 15: HUD And UI
 
-- [ ] Add health bar.
-- [ ] Add XP bar.
-- [ ] Add current animal display.
-- [ ] Add leaderboard panel.
-- [ ] Add minimap.
-- [ ] Add ping display.
-- [ ] Add FPS display in development.
-- [ ] Add settings panel.
-- [ ] Add sound toggle placeholder.
-- [ ] Add reconnecting state.
-- [ ] Add clean disconnect handling.
+- [x] Add health bar.
+- [x] Add XP bar.
+- [x] Add current animal display.
+- [x] Add leaderboard panel.
+- [x] Add minimap.
+- [x] Add ping display.
+- [x] Add FPS display in development.
+- [x] Add settings panel.
+- [x] Add sound toggle placeholder.
+- [x] Add reconnecting state.
+- [x] Add clean disconnect handling.
 
 ---
 
 ## Phase 16: Map And Biomes
 
-- [ ] Add terrain background rendering.
-- [ ] Add land biome.
-- [ ] Add water biome.
-- [ ] Add arctic biome.
-- [ ] Add biome boundaries.
-- [ ] Add biome movement modifiers.
-- [ ] Add biome-specific food.
-- [ ] Add biome-specific spawn rules.
-- [ ] Add river or water current visuals.
-- [ ] Add healing stone or special map objects.
-- [ ] Add collision for static obstacles if needed.
+- [x] Add terrain background rendering.
+- [x] Add land biome.
+- [x] Add water biome.
+- [x] Add arctic biome.
+- [x] Add biome boundaries.
+- [x] Add biome movement modifiers.
+- [x] Add biome-specific food.
+- [x] Add biome-specific spawn rules.
+- [x] Add river or water current visuals.
+- [x] Add healing stone or special map objects.
+- [x] Add collision for static obstacles if needed.
 
 ---
 
 ## Phase 17: Performance And Networking Polish
 
-- [ ] Add snapshot interpolation buffer.
-- [ ] Add entity object pooling on frontend.
-- [ ] Avoid recreating PixiJS sprites every snapshot.
-- [ ] Add dirty updates for changed entities.
-- [ ] Compress or reduce snapshot payloads.
-- [ ] Limit message rate from client.
-- [ ] Add backend message rate limiting.
-- [ ] Add server tick lag protection.
-- [ ] Add metrics for snapshot size.
-- [ ] Test with many simulated clients.
-- [ ] Profile frontend FPS with many entities.
+- [x] Add snapshot interpolation buffer.
+- [x] Add entity object pooling on frontend.
+- [x] Avoid recreating PixiJS sprites every snapshot.
+- [x] Add dirty updates for changed entities.
+- [x] Compress or reduce snapshot payloads.
+- [x] Limit message rate from client.
+- [x] Add backend message rate limiting.
+- [x] Add server tick lag protection.
+- [x] Add metrics for snapshot size.
+- [x] Test with many simulated clients.
+- [x] Profile frontend FPS with many entities.
 
 ---
 
 ## Phase 18: Testing
 
-- [ ] Add backend unit tests:
-  - [ ] Movement
-  - [ ] Collision
-  - [ ] Food pickup
-  - [ ] Evolution
-  - [ ] Predation
-  - [ ] Spatial grid
-- [ ] Add backend integration tests for WebSocket join flow.
-- [ ] Add frontend unit tests for protocol parsing.
-- [ ] Add frontend tests for stores.
-- [ ] Add manual multiplayer test checklist.
-- [ ] Add load test script for fake clients.
+- [x] Add backend unit tests:
+  - [x] Movement
+  - [x] Collision
+  - [x] Food pickup
+  - [x] Evolution
+  - [x] Predation
+  - [x] Spatial grid
+- [x] Add backend integration tests for WebSocket join flow.
+- [x] Add frontend unit tests for protocol parsing.
+- [x] Add frontend tests for stores.
+- [x] Add manual multiplayer test checklist.
+- [x] Add load test script for fake clients.
 - [ ] Test reconnect behavior.
-- [ ] Test malformed messages.
+- [x] Test malformed messages.
 - [ ] Test browser refresh while connected.
 - [ ] Test two or more players in same room.
 
@@ -359,33 +359,33 @@ Recommended default decisions:
 
 ## Phase 19: Build And Deployment
 
-- [ ] Add frontend production build.
-- [ ] Add backend production build.
-- [ ] Add Dockerfile for frontend.
-- [ ] Add Dockerfile for backend.
-- [ ] Add Docker Compose for local full-stack run.
-- [ ] Add reverse proxy config if needed.
-- [ ] Configure WebSocket proxy support.
-- [ ] Add production environment variables.
-- [ ] Add health checks.
-- [ ] Add deployment instructions to `README.md`.
+- [x] Add frontend production build.
+- [x] Add backend production build.
+- [x] Add Dockerfile for frontend.
+- [x] Add Dockerfile for backend.
+- [x] Add Docker Compose for local full-stack run.
+- [x] Add reverse proxy config if needed.
+- [x] Configure WebSocket proxy support.
+- [x] Add production environment variables.
+- [x] Add health checks.
+- [x] Add deployment instructions to `README.md`.
 - [ ] Verify clean clone setup works.
 
 ---
 
 ## Phase 20: Release Candidate
 
-- [ ] Run full backend test suite.
-- [ ] Run full frontend test suite.
-- [ ] Run lint and formatting.
-- [ ] Run local full-stack smoke test.
+- [x] Run full backend test suite.
+- [x] Run full frontend test suite.
+- [x] Run lint and formatting.
+- [x] Run local full-stack smoke test.
 - [ ] Test multiplayer with at least two browser sessions.
 - [ ] Test death and respawn.
 - [ ] Test evolution.
 - [ ] Test leaderboard.
-- [ ] Test asset loading after production build.
-- [ ] Fix critical bugs.
-- [ ] Create first playable release notes.
+- [x] Test asset loading after production build.
+- [x] Fix critical bugs.
+- [x] Create first playable release notes.
 
 ---
 
@@ -423,14 +423,14 @@ Recommended default decisions:
 
 The first sprint should produce a tiny playable vertical slice:
 
-- [ ] Create frontend Vite React app.
-- [ ] Create backend Spring Boot app.
-- [ ] Serve `/ws/game`.
-- [ ] Connect from frontend to backend.
-- [ ] Join with nickname.
-- [ ] Spawn one player.
-- [ ] Send mouse movement input.
-- [ ] Move player on server.
-- [ ] Broadcast snapshots.
-- [ ] Render player in PixiJS.
-- [ ] Open two browser tabs and see both players move.
+- [x] Create frontend Vite React app.
+- [x] Create backend Spring Boot app.
+- [x] Serve `/ws/game`.
+- [x] Connect from frontend to backend.
+- [x] Join with nickname.
+- [x] Spawn one player.
+- [x] Send mouse movement input.
+- [x] Move player on server.
+- [x] Broadcast snapshots.
+- [x] Render player in PixiJS.
+- [x] Open two browser tabs and see both players move.

@@ -22,6 +22,7 @@ export const ClientMessageType = {
   INPUT: 'input',
   EVOLVE: 'evolve',
   PING: 'ping',
+  GRID_DEBUG: 'grid_debug',
 } as const;
 
 /** Server → Client message types. */
@@ -72,8 +73,18 @@ export interface PingMessage {
   timestamp: number;
 }
 
+export interface GridDebugMessage {
+  type: typeof ClientMessageType.GRID_DEBUG;
+  enabled: boolean;
+}
+
 /** Union of all client → server messages. */
-export type ClientMessage = JoinMessage | InputMessage | EvolveMessage | PingMessage;
+export type ClientMessage =
+  | JoinMessage
+  | InputMessage
+  | EvolveMessage
+  | PingMessage
+  | GridDebugMessage;
 
 // ---------------------------------------------------------------------------
 // Server → Client messages
@@ -99,6 +110,7 @@ export interface SnapshotPlayerData {
   health: number;
   maxHealth: number;
   xp: number;
+  abilityCooldownTicks: number;
 }
 
 /** Food data within a snapshot. */
@@ -125,6 +137,25 @@ export interface FoodPickupData {
   playerId: string;
 }
 
+/** Kill event within a snapshot (for visual feedback). */
+export interface KillEventData {
+  victimId: string;
+  killerId: string;
+  killerNickname: string;
+  x: number;
+  y: number;
+  xpAwarded: number;
+}
+
+/** Ability event within a snapshot (for visual effects). */
+export interface AbilityEventData {
+  playerId: string;
+  abilityId: string;
+  x: number;
+  y: number;
+  angle: number;
+}
+
 /** Grid cell info for debug visualization. */
 export interface GridCellDebug {
   x: number;
@@ -143,6 +174,8 @@ export interface SnapshotMessage {
   foods: SnapshotFoodData[];
   leaderboard: LeaderboardEntry[];
   foodPickups?: FoodPickupData[];
+  killEvents?: KillEventData[];
+  abilityEvents?: AbilityEventData[];
   gridDebug?: GridCellDebug[];
 }
 
@@ -223,6 +256,10 @@ export function createPingMessage(): PingMessage {
   return { type: ClientMessageType.PING, timestamp: Date.now() };
 }
 
+export function createGridDebugMessage(enabled: boolean): GridDebugMessage {
+  return { type: ClientMessageType.GRID_DEBUG, enabled };
+}
+
 // ---------------------------------------------------------------------------
 // Message parsing (server → client)
 // ---------------------------------------------------------------------------
@@ -291,6 +328,12 @@ function parseSnapshot(data: Record<string, unknown>): SnapshotMessage | null {
       : [],
     foodPickups: Array.isArray(data.foodPickups)
       ? (data.foodPickups as FoodPickupData[])
+      : undefined,
+    killEvents: Array.isArray(data.killEvents)
+      ? (data.killEvents as KillEventData[])
+      : undefined,
+    abilityEvents: Array.isArray(data.abilityEvents)
+      ? (data.abilityEvents as AbilityEventData[])
       : undefined,
     gridDebug: Array.isArray(data.gridDebug)
       ? (data.gridDebug as GridCellDebug[])

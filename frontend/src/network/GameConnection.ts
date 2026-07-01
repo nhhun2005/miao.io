@@ -16,6 +16,8 @@ import { WS_URL } from '../config/env';
 import {
   createJoinMessage,
   createInputMessage,
+  createEvolveMessage,
+  createGridDebugMessage,
   createPingMessage,
   parseServerMessage,
   ServerMessageType,
@@ -23,7 +25,6 @@ import {
   type SnapshotMessage,
   type WelcomeMessage,
   type DeathMessage,
-  type PongMessage,
   type ErrorServerMessage,
 } from './protocol';
 import { useGameStore } from '../state/gameStore';
@@ -33,7 +34,7 @@ import { useUIStore } from '../state/uiStore';
 // Types
 // ---------------------------------------------------------------------------
 
-export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'joined';
+export type ConnectionState = 'disconnected' | 'connecting' | 'reconnecting' | 'connected' | 'joined';
 
 export interface GameConnectionCallbacks {
   /** Called when the connection state changes. */
@@ -53,9 +54,13 @@ export class GameConnection {
   private state: ConnectionState = 'disconnected';
   private callbacks: GameConnectionCallbacks;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private lastPingTime = 0;
   private _latency = 0;
   private destroyed = false;
+  private lastNickname: string | null = null;
+  private reconnectAttempts = 0;
+  private readonly maxReconnectAttempts = 3;
 
   constructor(callbacks: GameConnectionCallbacks = {}) {
     this.callbacks = callbacks;
@@ -66,20 +71,24 @@ export class GameConnection {
   // -----------------------------------------------------------------------
 
   /** Connect to the game server WebSocket. */
-  connect(): void {
+  connect(reconnecting = false): void {
     if (this.destroyed) return;
     if (this.ws) {
       this.disconnect();
     }
 
-    this.setState('connecting');
+    this.setState(reconnecting ? 'reconnecting' : 'connecting');
 
     try {
       this.ws = new WebSocket(WS_URL);
     } catch (err) {
       console.error('[GameConnection] Failed to create WebSocket:', err);
-      this.setState('disconnected');
-      this.callbacks.onError?.('Failed to connect to server.');
+      if (reconnecting) {
+        this.scheduleReconnect();
+      } else {
+        this.setState('disconnected');
+        this.callbacks.onError?.('Failed to connect to server.');
+      }
       return;
     }
 
@@ -92,6 +101,7 @@ export class GameConnection {
   /** Disconnect from the server. */
   disconnect(): void {
     this.stopPing();
+    this.stopReconnect();
     if (this.ws) {
       this.ws.onopen = null;
       this.ws.onmessage = null;
@@ -107,6 +117,7 @@ export class GameConnection {
 
   /** Send join message with nickname. */
   join(nickname: string): void {
+    this.lastNickname = nickname;
     this.send(createJoinMessage(nickname));
   }
 
@@ -115,9 +126,14 @@ export class GameConnection {
     this.send(createInputMessage(seq, angle, intensity, boost, ability));
   }
 
+  /** Send an evolve request. */
+  sendEvolve(animalId: string): void {
+    this.send(createEvolveMessage(animalId));
+  }
+
   /** Send grid debug toggle message. */
   sendGridDebugToggle(enabled: boolean): void {
-    this.send({ type: 'grid_debug', enabled });
+    this.send(createGridDebugMessage(enabled));
   }
 
   /** Send a ping for latency measurement. */
@@ -178,13 +194,13 @@ export class GameConnection {
     console.log('[GameConnection] WebSocket closed:', event.code, event.reason);
     this.stopPing();
     this.ws = null;
+    const previousState = this.state;
 
     if (!this.destroyed) {
-      this.setState('disconnected');
-      // If we were in the game, show an error
-      if (this.state === 'joined') {
-        useUIStore.getState().setError('Connection lost. Please rejoin.');
-        useUIStore.getState().setScreen('home');
+      if (previousState === 'joined' || previousState === 'reconnecting') {
+        this.scheduleReconnect();
+      } else {
+        this.setState('disconnected');
       }
     }
   };
@@ -210,13 +226,13 @@ export class GameConnection {
         this.handleDeath(msg);
         break;
       case ServerMessageType.PONG:
-        this.handlePong(msg);
+        this.handlePong();
         break;
       case ServerMessageType.ERROR:
         this.handleError(msg);
         break;
       case ServerMessageType.EVOLUTION_OPTIONS:
-        // Phase 12
+        useGameStore.getState().setEvolutionOptions(msg.options);
         break;
     }
   }
@@ -224,6 +240,7 @@ export class GameConnection {
   private handleWelcome(msg: WelcomeMessage): void {
     console.log('[GameConnection] Welcome received:', msg.playerId, msg.nickname);
     useGameStore.getState().setLocalPlayerId(msg.playerId);
+    this.reconnectAttempts = 0;
     this.setState('joined');
   }
 
@@ -250,7 +267,7 @@ export class GameConnection {
     );
   }
 
-  private handlePong(msg: PongMessage): void {
+  private handlePong(): void {
     if (this.lastPingTime > 0) {
       this._latency = Date.now() - this.lastPingTime;
     }
@@ -290,6 +307,31 @@ export class GameConnection {
     if (this.pingTimer !== null) {
       clearInterval(this.pingTimer);
       this.pingTimer = null;
+    }
+  }
+
+  private scheduleReconnect(): void {
+    if (this.destroyed || this.reconnectTimer) return;
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      this.setState('disconnected');
+      useUIStore.getState().setError('Connection lost. Please rejoin.');
+      useUIStore.getState().setScreen('home');
+      return;
+    }
+
+    this.reconnectAttempts += 1;
+    this.setState('reconnecting');
+    const delayMs = 500 * this.reconnectAttempts;
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.connect(true);
+    }, delayMs);
+  }
+
+  private stopReconnect(): void {
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
     }
   }
 }

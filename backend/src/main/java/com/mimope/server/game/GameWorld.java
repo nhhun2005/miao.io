@@ -1,8 +1,10 @@
 package com.mimope.server.game;
 
 import com.mimope.server.game.data.AnimalDefinition;
+import com.mimope.server.game.data.Biome;
 import com.mimope.server.game.data.FoodDefinition;
 import com.mimope.server.protocol.inbound.InputMessage;
+import com.mimope.server.protocol.outbound.EvolutionOptionsMessage;
 import com.mimope.server.protocol.outbound.SnapshotMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +33,7 @@ public class GameWorld {
 
     private final ConcurrentHashMap<String, PlayerEntity> players = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, FoodEntity> foods = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Long> playerSpawnMs = new ConcurrentHashMap<>();
     private final AtomicLong foodIdCounter = new AtomicLong(0);
 
     private final FoodSpawnService foodSpawnService;
@@ -41,11 +44,22 @@ public class GameWorld {
      */
     private final List<FoodPickupEvent> foodPickupEvents = new ArrayList<>();
 
+    /** Evolution option events emitted during the current tick. */
+    private final List<EvolutionOptionsEvent> evolutionOptionsEvents = new ArrayList<>();
+
+    /** Death events emitted during the current tick. */
+    private final List<DeathEvent> deathEvents = new ArrayList<>();
+
+    /** Ability events emitted during the current tick. */
+    private final List<AbilityEvent> abilityEvents = new ArrayList<>();
+
     /** Spatial grid for efficient collision and visibility queries. */
     private final SpatialGrid spatialGrid;
 
     /** Default visibility radius for snapshot filtering. */
     private static final double DEFAULT_VIEW_RADIUS = 2000.0;
+    private static final double DASH_SPEED_MULTIPLIER = 3.0;
+    private static final String DASH_ABILITY_ID = "dash";
 
     private long tick = 0;
 
@@ -73,6 +87,9 @@ public class GameWorld {
 
         // Clear events from previous tick
         foodPickupEvents.clear();
+        evolutionOptionsEvents.clear();
+        deathEvents.clear();
+        abilityEvents.clear();
 
         // 1. Process player inputs and apply movement
         for (PlayerEntity player : players.values()) {
@@ -80,7 +97,15 @@ public class GameWorld {
 
             InputMessage input = player.consumeInput();
             if (input != null) {
-                player.applyMovement(input, deltaTime, width, height);
+                double abilityMultiplier = 1.0;
+                if (input.ability() && player.canUseAbility(tick)) {
+                    player.markAbilityUsed(tick);
+                    abilityMultiplier = DASH_SPEED_MULTIPLIER;
+                    abilityEvents.add(new AbilityEvent(
+                            player.getId(), DASH_ABILITY_ID, player.getX(), player.getY(), input.angle()));
+                }
+                double biomeMultiplier = movementMultiplierAt(player.getX(), player.getY());
+                player.applyMovement(input, deltaTime, width, height, abilityMultiplier * biomeMultiplier);
             }
         }
 
@@ -89,6 +114,12 @@ public class GameWorld {
 
         // 3. Check food collisions using spatial grid — award XP, remove collected food
         checkFoodCollisionsSpatial();
+
+        // 4. Resolve player-vs-player predation.
+        checkPlayerPredation();
+
+        // 5. Send evolution options once a player has enough XP for the next tier.
+        checkEvolutionOptions();
 
         // 4. Despawn stale food
         foodSpawnService.despawnStaleFood(foods, tick);
@@ -227,6 +258,68 @@ public class GameWorld {
         }
     }
 
+    private void checkEvolutionOptions() {
+        for (PlayerEntity player : players.values()) {
+            if (!player.isAlive() || !player.shouldSendEvolutionOptions()) {
+                continue;
+            }
+
+            List<EvolutionOptionsMessage.EvolutionOption> options = player.getAvailableEvolutionOptions().stream()
+                    .map(a -> new EvolutionOptionsMessage.EvolutionOption(a.id(), a.name(), a.tier()))
+                    .toList();
+
+            evolutionOptionsEvents.add(new EvolutionOptionsEvent(player.getId(), options));
+            player.markEvolutionOptionsSent();
+        }
+    }
+
+    private void checkPlayerPredation() {
+        Set<String> killedThisTick = new HashSet<>();
+
+        for (PlayerEntity predator : players.values()) {
+            if (!predator.isAlive()) {
+                continue;
+            }
+
+            List<PlayerEntity> nearbyPlayers = spatialGrid.queryPlayers(
+                    predator.getX(), predator.getY(), predator.getRadius() * 2.5);
+
+            for (PlayerEntity prey : nearbyPlayers) {
+                if (predator == prey || !prey.isAlive() || killedThisTick.contains(prey.getId())) {
+                    continue;
+                }
+                if (!predator.getAnimal().canEat(prey.getAnimal().id())) {
+                    continue;
+                }
+
+                double dx = predator.getX() - prey.getX();
+                double dy = predator.getY() - prey.getY();
+                double touchDist = predator.getRadius() + prey.getRadius();
+                if (dx * dx + dy * dy > touchDist * touchDist) {
+                    continue;
+                }
+
+                double xpAwarded = Math.max(50.0, prey.getXp() * 0.25 + prey.getAnimal().tier() * 25.0);
+                prey.kill();
+                predator.addXp(xpAwarded);
+                killedThisTick.add(prey.getId());
+
+                long spawnedAt = playerSpawnMs.getOrDefault(prey.getId(), System.currentTimeMillis());
+                deathEvents.add(new DeathEvent(
+                        prey.getId(),
+                        predator.getId(),
+                        predator.getNickname(),
+                        prey.getX(),
+                        prey.getY(),
+                        xpAwarded,
+                        Math.max(0, System.currentTimeMillis() - spawnedAt)
+                ));
+
+                log.debug("{} ate {} (+{}xp)", predator.getNickname(), prey.getNickname(), xpAwarded);
+            }
+        }
+    }
+
     // ------------------------------------------------------------------ players
 
     /**
@@ -243,6 +336,7 @@ public class GameWorld {
 
         PlayerEntity player = new PlayerEntity(playerId, nickname, starter, x, y);
         players.put(playerId, player);
+        playerSpawnMs.put(playerId, System.currentTimeMillis());
 
         log.info("Player spawned: {} at ({}, {})", player, x, y);
         return player;
@@ -255,6 +349,7 @@ public class GameWorld {
      */
     public PlayerEntity removePlayer(String playerId) {
         PlayerEntity removed = players.remove(playerId);
+        playerSpawnMs.remove(playerId);
         if (removed != null) {
             log.info("Player removed: {}", removed);
         }
@@ -312,6 +407,40 @@ public class GameWorld {
         return Collections.unmodifiableList(foodPickupEvents);
     }
 
+    /**
+     * Get the evolution option events from the current tick.
+     */
+    public List<EvolutionOptionsEvent> getEvolutionOptionsEvents() {
+        return Collections.unmodifiableList(evolutionOptionsEvents);
+    }
+
+    public List<DeathEvent> getDeathEvents() {
+        return Collections.unmodifiableList(deathEvents);
+    }
+
+    public List<AbilityEvent> getAbilityEvents() {
+        return Collections.unmodifiableList(abilityEvents);
+    }
+
+    public EvolutionResult evolvePlayer(String playerId, String animalId) {
+        PlayerEntity player = players.get(playerId);
+        if (player == null || !player.isAlive()) {
+            return EvolutionResult.failure("Player is not alive.");
+        }
+
+        AnimalDefinition target = AnimalDefinition.byId(animalId);
+        if (target == null) {
+            return EvolutionResult.failure("Unknown animal: " + animalId);
+        }
+
+        if (!player.canEvolveTo(target)) {
+            return EvolutionResult.failure("Evolution is not available yet.");
+        }
+
+        player.setAnimal(target);
+        return EvolutionResult.success(player);
+    }
+
     // ------------------------------------------------------------------ world info
 
     public double getWidth() {
@@ -332,7 +461,45 @@ public class GameWorld {
 
     // ------------------------------------------------------------------ helpers
 
+    public Biome biomeAt(double x, double y) {
+        if (x < width * 0.28) {
+            return Biome.OCEAN;
+        }
+        if (y > height * 0.64) {
+            return Biome.ARCTIC;
+        }
+        return Biome.LAND;
+    }
+
+    public double movementMultiplierAt(double x, double y) {
+        return switch (biomeAt(x, y)) {
+            case LAND -> 1.0;
+            case OCEAN -> 0.78;
+            case ARCTIC -> 0.86;
+        };
+    }
+
     private static double randomRange(double min, double max) {
         return min + ThreadLocalRandom.current().nextDouble() * (max - min);
+    }
+
+    public record EvolutionOptionsEvent(
+            String playerId,
+            List<EvolutionOptionsMessage.EvolutionOption> options
+    ) {
+    }
+
+    public record EvolutionResult(
+            boolean success,
+            String error,
+            PlayerEntity player
+    ) {
+        public static EvolutionResult success(PlayerEntity player) {
+            return new EvolutionResult(true, null, player);
+        }
+
+        public static EvolutionResult failure(String error) {
+            return new EvolutionResult(false, error, null);
+        }
     }
 }

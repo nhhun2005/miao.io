@@ -55,6 +55,10 @@ export function GameCanvas({ connection, showGridDebug = false }: GameCanvasProp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
 
+  useEffect(() => {
+    connection.sendGridDebugToggle(showGridDebug);
+  }, [connection, showGridDebug]);
+
   return (
     <div className="game-canvas-wrapper">
       <div ref={containerRef} className="game-canvas-container" />

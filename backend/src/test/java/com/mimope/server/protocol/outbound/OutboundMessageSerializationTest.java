@@ -98,11 +98,13 @@ class OutboundMessageSerializationTest {
                 42L,
                 List.of(new SnapshotMessage.PlayerData(
                         "p1", "Alice", 100.0, 200.0, 22.0, 1.5,
-                        "mouse", 100.0, 100.0, 0.0
+                        "mouse", 100.0, 100.0, 0.0, 0L
                 )),
                 List.of(new SnapshotMessage.FoodData("f1", "berry", 300.0, 400.0)),
                 List.of(new SnapshotMessage.LeaderboardEntry("Alice", 0.0)),
                 List.of(new SnapshotMessage.FoodPickupData("f1", "berry", 300.0, 400.0, 5, "p1")),
+                List.of(new SnapshotMessage.KillEventData("p2", "p1", "Alice", 100.0, 200.0, 75.0)),
+                List.of(new SnapshotMessage.AbilityEventData("p1", "dash", 100.0, 200.0, 0.0)),
                 null
         );
         Map<String, Object> map = msg.toMap();
@@ -134,12 +136,20 @@ class OutboundMessageSerializationTest {
         assertEquals("f1", foodPickups.get(0).get("foodInstanceId"));
         assertEquals("p1", foodPickups.get(0).get("playerId"));
         assertEquals(5, foodPickups.get(0).get("xp"));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> killEvents = (List<Map<String, Object>>) map.get("killEvents");
+        assertEquals("p2", killEvents.get(0).get("victimId"));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> abilityEvents = (List<Map<String, Object>>) map.get("abilityEvents");
+        assertEquals("dash", abilityEvents.get(0).get("abilityId"));
     }
 
     @Test
     void snapshotPlayerDataToMap() {
         SnapshotMessage.PlayerData pd = new SnapshotMessage.PlayerData(
-                "id1", "Bob", 50.0, 75.0, 28.0, 0.5, "rabbit", 150.0, 150.0, 50.0
+                "id1", "Bob", 50.0, 75.0, 28.0, 0.5, "rabbit", 150.0, 150.0, 50.0, 20L
         );
         Map<String, Object> map = pd.toMap();
 
@@ -153,5 +163,6 @@ class OutboundMessageSerializationTest {
         assertEquals(150.0, map.get("health"));
         assertEquals(150.0, map.get("maxHealth"));
         assertEquals(50.0, map.get("xp"));
+        assertEquals(20L, map.get("abilityCooldownTicks"));
     }
 }

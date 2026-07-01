@@ -84,6 +84,28 @@ export const FOODS: Record<string, FoodDefinition> = {
     imagePath: 'img/watermelon.png',
     edibleImagePath: 'img/watermelon_e.png',
   },
+  seaweed: {
+    id: 'seaweed',
+    name: 'Seaweed',
+    xp: 20,
+    radius: 14,
+    minTier: 1,
+    biome: 'ocean',
+    spawnWeight: 35,
+    imagePath: 'img/seaweed.png',
+    edibleImagePath: 'img/seaweed_e.png',
+  },
+  arctic_berry: {
+    id: 'arctic_berry',
+    name: 'Arctic Berry',
+    xp: 12,
+    radius: 10,
+    minTier: 1,
+    biome: 'arctic',
+    spawnWeight: 35,
+    imagePath: 'img/arcticBerry.png',
+    edibleImagePath: 'img/arcticBerry_e.png',
+  },
 };
 
 /** All food IDs as an array. */

@@ -18,12 +18,16 @@ public class ClientSession {
     private String nickname;
     private Instant connectedAt;
     private Instant lastPongAt;
+    private long rateWindowStartedMs;
+    private int messagesInWindow;
+    private static final int MAX_MESSAGES_PER_SECOND = 60;
 
     public ClientSession(WebSocketSession webSocketSession) {
         this.id = webSocketSession.getId();
         this.webSocketSession = Objects.requireNonNull(webSocketSession);
         this.connectedAt = Instant.now();
         this.lastPongAt = this.connectedAt;
+        this.rateWindowStartedMs = System.currentTimeMillis();
     }
 
     public String getId() {
@@ -56,6 +60,16 @@ public class ClientSession {
 
     public boolean isOpen() {
         return webSocketSession.isOpen();
+    }
+
+    public synchronized boolean allowMessage() {
+        long now = System.currentTimeMillis();
+        if (now - rateWindowStartedMs >= 1000) {
+            rateWindowStartedMs = now;
+            messagesInWindow = 0;
+        }
+        messagesInWindow++;
+        return messagesInWindow <= MAX_MESSAGES_PER_SECOND;
     }
 
     @Override

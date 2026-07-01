@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useUIStore } from '../../state/uiStore';
 import { useInputStore } from '../../state/inputStore';
+import { useGameStore } from '../../state/gameStore';
 import { GameCanvas } from '../../game/GameCanvas';
-import { Button } from '../../ui';
+import { ANIMALS } from '../../game/data/animals';
+import { Button, Modal } from '../../ui';
 import type { GameConnection } from '../../network/GameConnection';
 
 /**
@@ -12,7 +14,6 @@ import type { GameConnection } from '../../network/GameConnection';
  */
 export function GameScreen() {
   const nickname = useUIStore((s) => s.nickname);
-  const showDeath = useUIStore((s) => s.showDeath);
 
   // Input debug state from InputManager → inputStore
   const angle = useInputStore((s) => s.angle);
@@ -21,34 +22,57 @@ export function GameScreen() {
   const ability = useInputStore((s) => s.ability);
   const seq = useInputStore((s) => s.seq);
   const focused = useInputStore((s) => s.focused);
+  const localPlayerId = useGameStore((s) => s.localPlayerId);
+  const players = useGameStore((s) => s.players);
+  const evolutionOptions = useGameStore((s) => s.evolutionOptions);
+  const clearEvolutionOptions = useGameStore((s) => s.clearEvolutionOptions);
+  const leaderboard = useGameStore((s) => s.leaderboard);
 
-  // Retrieve the GameConnection stored by LoadingScreen
-  const connectionRef = useRef<GameConnection | null>(null);
+  const [connection] = useState<GameConnection | null>(() => {
+    const win = window as unknown as Record<string, unknown>;
+    return (win.__mimope_connection as GameConnection) ?? null;
+  });
 
   useEffect(() => {
-    const win = window as unknown as Record<string, unknown>;
-    connectionRef.current = (win.__mimope_connection as GameConnection) ?? null;
-
     return () => {
       // Only destroy the socket when the app actually leaves the game flow.
       // React dev StrictMode intentionally mounts/unmounts effects once to
       // detect unsafe side effects; destroying the connection during that
       // probe leaves the real GameCanvas mounted without live snapshots.
-      if (connectionRef.current && useUIStore.getState().screen !== 'game') {
-        connectionRef.current.destroy();
-        connectionRef.current = null;
+      if (connection && useUIStore.getState().screen !== 'game') {
+        const win = window as unknown as Record<string, unknown>;
+        connection.destroy();
         delete win.__mimope_connection;
       }
     };
-  }, []);
-
-  const connection = connectionRef.current
-    ?? ((window as unknown as Record<string, unknown>).__mimope_connection as GameConnection | undefined)
-    ?? null;
+  }, [connection]);
 
   const [showGridDebug, setShowGridDebug] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [latency, setLatency] = useState(0);
+
+  useEffect(() => {
+    if (!connection) return;
+    const timer = window.setInterval(() => setLatency(connection.latency), 500);
+    return () => window.clearInterval(timer);
+  }, [connection]);
 
   const angleDeg = ((angle * 180) / Math.PI).toFixed(0);
+  const localPlayer = localPlayerId ? players[localPlayerId] : null;
+  const currentAnimal = localPlayer ? ANIMALS[localPlayer.animalId] : null;
+  const nextEvolution = currentAnimal
+    ? Object.values(ANIMALS).find((animal) => animal.tier === currentAnimal.tier + 1)
+    : null;
+  const xpForCurrentTier = currentAnimal?.xpRequired ?? 0;
+  const xpForNextTier = nextEvolution?.xpRequired ?? xpForCurrentTier;
+  const xpProgress = nextEvolution && localPlayer
+    ? Math.max(0, Math.min(1, (localPlayer.xp - xpForCurrentTier) / (xpForNextTier - xpForCurrentTier)))
+    : 1;
+  const healthProgress = localPlayer
+    ? Math.max(0, Math.min(1, localPlayer.health / localPlayer.maxHealth))
+    : 0;
+  const abilityReady = !localPlayer || localPlayer.abilityCooldownTicks <= 0;
 
   if (!connection) {
     return (
@@ -70,17 +94,84 @@ export function GameScreen() {
 
       {/* HUD overlay — player info */}
       <div className="game-overlay game-overlay--top-left">
-        <div className="game-hud-info">
-          <span className="game-hud-info__nickname">🎮 {nickname || 'Player'}</span>
-          <span className="game-hud-info__hint">
-            Move: mouse · Boost: click/space · Ability: W/right-click · Zoom: scroll
-          </span>
+        <div className="game-hud">
+          <div className="game-hud__identity">
+            <span className="game-hud__nickname">{nickname || 'Player'}</span>
+            <span className="game-hud__animal">{currentAnimal?.name ?? 'Mouse'}</span>
+          </div>
+          <div className="game-meter">
+            <span>HP</span>
+            <div className="game-meter__track">
+              <div className="game-meter__fill game-meter__fill--health" style={{ width: `${healthProgress * 100}%` }} />
+            </div>
+            <strong>{Math.round(localPlayer?.health ?? 0)}</strong>
+          </div>
+          <div className="game-meter">
+            <span>XP</span>
+            <div className="game-meter__track">
+              <div className="game-meter__fill game-meter__fill--xp" style={{ width: `${xpProgress * 100}%` }} />
+            </div>
+            <strong>{Math.floor(localPlayer?.xp ?? 0)}</strong>
+          </div>
+          <div className="game-hud__ability">
+            <span>Dash</span>
+            <strong>{abilityReady ? 'Ready' : `${localPlayer?.abilityCooldownTicks ?? 0}t`}</strong>
+          </div>
         </div>
       </div>
 
       {/* Input debug overlay */}
       <div className="game-overlay game-overlay--top-right">
-        <div className="game-debug-panel">
+        <div className="leaderboard-panel">
+          <div className="leaderboard-panel__title">Leaderboard</div>
+          {leaderboard.length === 0 && <div className="leaderboard-panel__empty">No scores yet</div>}
+          {leaderboard.map((entry, index) => (
+            <div className="leaderboard-panel__row" key={`${entry.nickname}-${index}`}>
+              <span>{index + 1}. {entry.nickname}</span>
+              <strong>{Math.floor(entry.xp)}</strong>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="game-overlay game-overlay--right">
+        <div className="minimap">
+          {Object.values(players).map((player) => (
+            <span
+              key={player.id}
+              className={`minimap__dot ${player.id === localPlayerId ? 'minimap__dot--self' : ''}`}
+              style={{
+                left: `${(player.x / 5000) * 100}%`,
+                top: `${(player.y / 5000) * 100}%`,
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="game-overlay game-overlay--bottom-right">
+        <div className="game-status-panel">
+          <span>Ping {latency || '--'}ms</span>
+          <span>{connection.connectionState}</span>
+          <button type="button" onClick={() => setSettingsOpen((v) => !v)}>Settings</button>
+        </div>
+        {settingsOpen && (
+          <div className="settings-panel">
+            <label className="settings-panel__toggle">
+              <input
+                type="checkbox"
+                checked={soundEnabled}
+                onChange={(e) => setSoundEnabled(e.target.checked)}
+              />
+              Sound
+            </label>
+          </div>
+        )}
+      </div>
+
+      <div className="game-overlay game-overlay--debug">
+        <details className="game-debug-panel">
+          <summary className="game-debug-panel__title">Input Debug</summary>
           <div className="game-debug-panel__title">Input Debug</div>
           <div className="game-debug-panel__row">
             <span>Angle:</span>
@@ -112,7 +203,7 @@ export function GameScreen() {
               {focused ? '✅' : '⏸ paused'}
             </span>
           </div>
-        </div>
+        </details>
       </div>
 
       {/* Grid debug toggle */}
@@ -126,15 +217,39 @@ export function GameScreen() {
         </button>
       </div>
 
-      {/* Temporary test button — will be removed when real gameplay is added */}
-      <div className="game-overlay game-overlay--bottom">
-        <Button
-          variant="danger"
-          onClick={() => showDeath('You were eaten by a Lion!')}
-        >
-          Test Death Screen
-        </Button>
-      </div>
+      <Modal open={evolutionOptions.length > 0}>
+        <div className="evolution-modal">
+          <h2 className="evolution-modal__title">Choose Evolution</h2>
+          <p className="evolution-modal__meta">
+            Current XP: {Math.floor(localPlayer?.xp ?? 0)}
+          </p>
+          <div className="evolution-modal__options">
+            {evolutionOptions.map((option) => {
+              const animal = ANIMALS[option.animalId];
+              return (
+                <button
+                  key={option.animalId}
+                  className="evolution-card"
+                  onClick={() => {
+                    connection.sendEvolve(option.animalId);
+                    clearEvolutionOptions();
+                  }}
+                >
+                  {animal?.fullSizePath && (
+                    <img
+                      className="evolution-card__image"
+                      src={`/${animal.fullSizePath}`}
+                      alt=""
+                    />
+                  )}
+                  <span className="evolution-card__name">{option.name}</span>
+                  <span className="evolution-card__tier">Tier {option.tier}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

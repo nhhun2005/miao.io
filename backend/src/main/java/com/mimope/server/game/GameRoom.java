@@ -1,6 +1,8 @@
 package com.mimope.server.game;
 
 import com.mimope.server.protocol.inbound.InputMessage;
+import com.mimope.server.protocol.outbound.EvolutionOptionsMessage;
+import com.mimope.server.protocol.outbound.DeathMessage;
 import com.mimope.server.protocol.outbound.SnapshotMessage;
 import com.mimope.server.websocket.ClientSession;
 import com.mimope.server.websocket.MessageEncoder;
@@ -160,6 +162,30 @@ public class GameRoom {
                 ))
                 .toList();
 
+        List<SnapshotMessage.KillEventData> killEvents = world.getDeathEvents().stream()
+                .map(e -> new SnapshotMessage.KillEventData(
+                        e.victimId(),
+                        e.killerId(),
+                        e.killerNickname(),
+                        e.x(),
+                        e.y(),
+                        e.xpAwarded()
+                ))
+                .toList();
+
+        List<SnapshotMessage.AbilityEventData> abilityEvents = world.getAbilityEvents().stream()
+                .map(e -> new SnapshotMessage.AbilityEventData(
+                        e.playerId(),
+                        e.abilityId(),
+                        e.x(),
+                        e.y(),
+                        e.angle()
+                ))
+                .toList();
+
+        sendEvolutionOptions();
+        sendDeathMessages();
+
         // Send per-player filtered snapshots
         for (ClientSession session : sessionRegistry.getAll()) {
             if (session.getNickname() == null) continue; // not yet joined
@@ -196,7 +222,14 @@ public class GameRoom {
                     : null;
 
             SnapshotMessage snapshot = new SnapshotMessage(
-                    world.getTick(), playerDataList, foodDataList, leaderboard, foodPickups, gridDebug);
+                    world.getTick(),
+                    playerDataList,
+                    foodDataList,
+                    leaderboard,
+                    foodPickups,
+                    killEvents,
+                    abilityEvents,
+                    gridDebug);
 
             // Measure snapshot size reduction
             int filteredSize = estimateJsonSize(snapshot.toMap());
@@ -204,6 +237,35 @@ public class GameRoom {
             snapshotMetrics.record(filteredSize, unfilteredSize);
 
             messageEncoder.send(session, SnapshotMessage.TYPE, snapshot.toMap());
+        }
+    }
+
+    private void sendEvolutionOptions() {
+        for (GameWorld.EvolutionOptionsEvent event : world.getEvolutionOptionsEvents()) {
+            ClientSession session = sessionRegistry.get(event.playerId());
+            if (session == null || !session.isOpen()) {
+                continue;
+            }
+
+            EvolutionOptionsMessage message = new EvolutionOptionsMessage(event.options());
+            messageEncoder.send(session, EvolutionOptionsMessage.TYPE, message.toMap());
+        }
+    }
+
+    private void sendDeathMessages() {
+        for (DeathEvent event : world.getDeathEvents()) {
+            ClientSession session = sessionRegistry.get(event.victimId());
+            if (session == null || !session.isOpen()) {
+                continue;
+            }
+
+            DeathMessage message = new DeathMessage(
+                    "eaten",
+                    event.killerNickname(),
+                    event.xpAwarded(),
+                    event.survivalTimeMs()
+            );
+            messageEncoder.send(session, DeathMessage.TYPE, message.toMap());
         }
     }
 
@@ -218,7 +280,8 @@ public class GameRoom {
                 p.getAnimal().id(),
                 p.getHealth(),
                 p.getMaxHealth(),
-                p.getXp()
+                p.getXp(),
+                p.getAbilityCooldownRemainingTicks(world.getTick())
         );
     }
 
@@ -286,7 +349,7 @@ public class GameRoom {
                         f.getInstanceId(), f.getFoodId(), f.getX(), f.getY()))
                 .toList();
         SnapshotMessage unfiltered = new SnapshotMessage(
-                world.getTick(), allPlayers, allFood, leaderboard, foodPickups, null);
+                world.getTick(), allPlayers, allFood, leaderboard, foodPickups, null, null, null);
         return estimateJsonSize(unfiltered.toMap());
     }
 
@@ -302,5 +365,13 @@ public class GameRoom {
 
     public int getMaxPlayers() {
         return maxPlayers;
+    }
+
+    public boolean isGridDebugEnabled() {
+        return gridDebugEnabled;
+    }
+
+    public void setGridDebugEnabled(boolean gridDebugEnabled) {
+        this.gridDebugEnabled = gridDebugEnabled;
     }
 }

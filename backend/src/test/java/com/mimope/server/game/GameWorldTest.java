@@ -148,6 +148,7 @@ class GameWorldTest {
     @Test
     void tickAppliesPlayerMovement() {
         PlayerEntity player = world.spawnPlayer("p1", "Alice");
+        setPlayerPosition(player, 2500, 2500);
         double startX = player.getX();
 
         // Queue input to move right
@@ -300,6 +301,103 @@ class GameWorldTest {
         assertTrue(world.getFoodPickupEvents().isEmpty());
     }
 
+    // ------------------------------------------------------------------ evolution
+
+    @Test
+    void tickEmitsEvolutionOptionsWhenThresholdReached() {
+        PlayerEntity player = world.spawnPlayer("p1", "Alice");
+        player.addXp(50);
+
+        world.tick(0.05);
+
+        assertEquals(1, world.getEvolutionOptionsEvents().size());
+        GameWorld.EvolutionOptionsEvent event = world.getEvolutionOptionsEvents().get(0);
+        assertEquals(player.getId(), event.playerId());
+        assertEquals("rabbit", event.options().get(0).animalId());
+    }
+
+    @Test
+    void evolutionOptionsAreOnlySentOnceUntilEvolution() {
+        PlayerEntity player = world.spawnPlayer("p1", "Alice");
+        player.addXp(50);
+
+        world.tick(0.05);
+        assertEquals(1, world.getEvolutionOptionsEvents().size());
+
+        world.tick(0.05);
+        assertTrue(world.getEvolutionOptionsEvents().isEmpty());
+    }
+
+    @Test
+    void evolvePlayerValidatesThresholdAndPath() {
+        PlayerEntity player = world.spawnPlayer("p1", "Alice");
+
+        GameWorld.EvolutionResult tooEarly = world.evolvePlayer(player.getId(), "rabbit");
+        assertFalse(tooEarly.success());
+        assertEquals("mouse", player.getAnimal().id());
+
+        player.addXp(50);
+        GameWorld.EvolutionResult evolved = world.evolvePlayer(player.getId(), "rabbit");
+        assertTrue(evolved.success());
+        assertEquals("rabbit", player.getAnimal().id());
+        assertEquals(AnimalDefinition.byId("rabbit").maxHealth(), player.getHealth());
+    }
+
+    @Test
+    void evolvePlayerRejectsSkippedTier() {
+        PlayerEntity player = world.spawnPlayer("p1", "Alice");
+        player.addXp(500);
+
+        GameWorld.EvolutionResult result = world.evolvePlayer(player.getId(), "fox");
+
+        assertFalse(result.success());
+        assertEquals("mouse", player.getAnimal().id());
+    }
+
+    // ------------------------------------------------------------------ predation and abilities
+
+    @Test
+    void predatorCollisionKillsPreyAndAwardsXp() {
+        PlayerEntity predator = world.spawnPlayer("p1", "Hunter");
+        PlayerEntity prey = world.spawnPlayer("p2", "Snack");
+        predator.setAnimal(AnimalDefinition.byId("fox"));
+        setPlayerPosition(predator, 500, 500);
+        setPlayerPosition(prey, 510, 500);
+
+        world.tick(0.05);
+
+        assertFalse(prey.isAlive());
+        assertTrue(predator.getXp() >= 50);
+        assertEquals(1, world.getDeathEvents().size());
+        assertEquals(prey.getId(), world.getDeathEvents().get(0).victimId());
+    }
+
+    @Test
+    void sameTierCollisionDoesNotKill() {
+        PlayerEntity a = world.spawnPlayer("p1", "Alice");
+        PlayerEntity b = world.spawnPlayer("p2", "Bob");
+        setPlayerPosition(a, 500, 500);
+        setPlayerPosition(b, 510, 500);
+
+        world.tick(0.05);
+
+        assertTrue(a.isAlive());
+        assertTrue(b.isAlive());
+        assertTrue(world.getDeathEvents().isEmpty());
+    }
+
+    @Test
+    void abilityInputCreatesDashEventAndCooldown() {
+        PlayerEntity player = world.spawnPlayer("p1", "Alice");
+        world.queueInput("p1", new InputMessage(1, 0.0, 1.0, false, true, 0L));
+
+        world.tick(0.05);
+
+        assertEquals(1, world.getAbilityEvents().size());
+        assertEquals("dash", world.getAbilityEvents().get(0).abilityId());
+        assertTrue(player.getAbilityCooldownRemainingTicks(world.getTick()) > 0);
+    }
+
     @SuppressWarnings("unchecked")
     private FoodEntity addFoodAt(String instanceId, FoodDefinition definition, double x, double y) {
         try {
@@ -311,6 +409,19 @@ class GameWorldTest {
             return food;
         } catch (ReflectiveOperationException ex) {
             throw new AssertionError("Unable to seed test food", ex);
+        }
+    }
+
+    private void setPlayerPosition(PlayerEntity player, double x, double y) {
+        try {
+            Field xField = PlayerEntity.class.getDeclaredField("x");
+            Field yField = PlayerEntity.class.getDeclaredField("y");
+            xField.setAccessible(true);
+            yField.setAccessible(true);
+            xField.set(player, x);
+            yField.set(player, y);
+        } catch (ReflectiveOperationException ex) {
+            throw new AssertionError("Unable to position test player", ex);
         }
     }
 }

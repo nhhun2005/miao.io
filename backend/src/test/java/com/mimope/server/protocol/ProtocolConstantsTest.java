@@ -17,6 +17,7 @@ class ProtocolConstantsTest {
         assertFalse(ProtocolConstants.TYPE_INPUT.isBlank());
         assertFalse(ProtocolConstants.TYPE_EVOLVE.isBlank());
         assertFalse(ProtocolConstants.TYPE_PING.isBlank());
+        assertFalse(ProtocolConstants.TYPE_GRID_DEBUG.isBlank());
     }
 
     @Test
@@ -36,6 +37,7 @@ class ProtocolConstantsTest {
                 ProtocolConstants.TYPE_INPUT,
                 ProtocolConstants.TYPE_EVOLVE,
                 ProtocolConstants.TYPE_PING,
+                ProtocolConstants.TYPE_GRID_DEBUG,
                 ProtocolConstants.TYPE_WELCOME,
                 ProtocolConstants.TYPE_SNAPSHOT,
                 ProtocolConstants.TYPE_EVOLUTION_OPTIONS,

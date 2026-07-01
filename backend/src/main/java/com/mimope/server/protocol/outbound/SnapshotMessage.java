@@ -25,6 +25,8 @@ public record SnapshotMessage(
         List<FoodData> foods,
         List<LeaderboardEntry> leaderboard,
         List<FoodPickupData> foodPickups,
+        List<KillEventData> killEvents,
+        List<AbilityEventData> abilityEvents,
         List<GridCellDebug> gridDebug
 ) {
 
@@ -41,7 +43,8 @@ public record SnapshotMessage(
             String animalId,
             double health,
             double maxHealth,
-            double xp
+            double xp,
+            long abilityCooldownTicks
     ) {
         public Map<String, Object> toMap() {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -55,6 +58,7 @@ public record SnapshotMessage(
             m.put("health", health);
             m.put("maxHealth", maxHealth);
             m.put("xp", xp);
+            m.put("abilityCooldownTicks", abilityCooldownTicks);
             return m;
         }
     }
@@ -110,6 +114,46 @@ public record SnapshotMessage(
         }
     }
 
+    /** Kill event data included in snapshots for visual feedback. */
+    public record KillEventData(
+            String victimId,
+            String killerId,
+            String killerNickname,
+            double x,
+            double y,
+            double xpAwarded
+    ) {
+        public Map<String, Object> toMap() {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("victimId", victimId);
+            m.put("killerId", killerId);
+            m.put("killerNickname", killerNickname);
+            m.put("x", x);
+            m.put("y", y);
+            m.put("xpAwarded", xpAwarded);
+            return m;
+        }
+    }
+
+    /** Ability event data included in snapshots for visual effects. */
+    public record AbilityEventData(
+            String playerId,
+            String abilityId,
+            double x,
+            double y,
+            double angle
+    ) {
+        public Map<String, Object> toMap() {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("playerId", playerId);
+            m.put("abilityId", abilityId);
+            m.put("x", x);
+            m.put("y", y);
+            m.put("angle", angle);
+            return m;
+        }
+    }
+
     /** Grid cell debug info for spatial-grid visualization on the frontend. */
     public record GridCellDebug(
             double x,
@@ -140,6 +184,12 @@ public record SnapshotMessage(
         map.put("leaderboard", leaderboard.stream().map(LeaderboardEntry::toMap).toList());
         if (foodPickups != null && !foodPickups.isEmpty()) {
             map.put("foodPickups", foodPickups.stream().map(FoodPickupData::toMap).toList());
+        }
+        if (killEvents != null && !killEvents.isEmpty()) {
+            map.put("killEvents", killEvents.stream().map(KillEventData::toMap).toList());
+        }
+        if (abilityEvents != null && !abilityEvents.isEmpty()) {
+            map.put("abilityEvents", abilityEvents.stream().map(AbilityEventData::toMap).toList());
         }
         if (gridDebug != null && !gridDebug.isEmpty()) {
             map.put("gridDebug", gridDebug.stream().map(GridCellDebug::toMap).toList());

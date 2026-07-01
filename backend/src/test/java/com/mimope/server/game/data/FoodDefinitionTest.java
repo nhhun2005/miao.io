@@ -15,12 +15,14 @@ class FoodDefinitionTest {
     @Test
     void registryContainsAllFirstPlayableFoods() {
         Map<String, FoodDefinition> all = FoodDefinition.all();
-        assertEquals(5, all.size());
+        assertEquals(7, all.size());
         assertNotNull(all.get("berry"));
         assertNotNull(all.get("banana"));
         assertNotNull(all.get("meat"));
         assertNotNull(all.get("coconut"));
         assertNotNull(all.get("watermelon"));
+        assertNotNull(all.get("seaweed"));
+        assertNotNull(all.get("arctic_berry"));
     }
 
     @Test
@@ -39,18 +41,20 @@ class FoodDefinitionTest {
     @Test
     void allIdsReturnsCorrectList() {
         List<String> ids = FoodDefinition.allIds();
-        assertEquals(5, ids.size());
+        assertEquals(7, ids.size());
         assertTrue(ids.contains("berry"));
         assertTrue(ids.contains("banana"));
         assertTrue(ids.contains("meat"));
         assertTrue(ids.contains("coconut"));
         assertTrue(ids.contains("watermelon"));
+        assertTrue(ids.contains("seaweed"));
+        assertTrue(ids.contains("arctic_berry"));
     }
 
     @Test
     void totalSpawnWeightIsCorrect() {
-        // 50 + 30 + 10 + 20 + 5 = 115
-        assertEquals(115, FoodDefinition.totalSpawnWeight());
+        // 50 + 30 + 10 + 20 + 5 + 35 + 35 = 185
+        assertEquals(185, FoodDefinition.totalSpawnWeight());
     }
 
     @Test
@@ -74,11 +78,10 @@ class FoodDefinitionTest {
     }
 
     @Test
-    void allFoodsHaveLandBiome() {
-        for (FoodDefinition food : FoodDefinition.all().values()) {
-            assertEquals(Biome.LAND, food.biome(),
-                    food.id() + " should be in LAND biome for Phase 2");
-        }
+    void registryIncludesBiomeSpecificFoods() {
+        assertEquals(Biome.LAND, FoodDefinition.byId("berry").biome());
+        assertEquals(Biome.OCEAN, FoodDefinition.byId("seaweed").biome());
+        assertEquals(Biome.ARCTIC, FoodDefinition.byId("arctic_berry").biome());
     }
 
     @Test

@@ -6,6 +6,7 @@ import {
   createJoinMessage,
   createInputMessage,
   createEvolveMessage,
+  createGridDebugMessage,
   createPingMessage,
   parseServerMessage,
 } from './protocol';
@@ -24,6 +25,7 @@ describe('Protocol constants', () => {
     expect(ClientMessageType.INPUT).toBe('input');
     expect(ClientMessageType.EVOLVE).toBe('evolve');
     expect(ClientMessageType.PING).toBe('ping');
+    expect(ClientMessageType.GRID_DEBUG).toBe('grid_debug');
   });
 
   it('defines all server message types', () => {
@@ -85,6 +87,14 @@ describe('createPingMessage', () => {
   });
 });
 
+describe('createGridDebugMessage', () => {
+  it('creates a grid debug toggle message', () => {
+    const msg = createGridDebugMessage(true);
+    expect(msg.type).toBe('grid_debug');
+    expect(msg.enabled).toBe(true);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Server message parsing — valid messages
 // ---------------------------------------------------------------------------
@@ -123,10 +133,13 @@ describe('parseServerMessage', () => {
           health: 100,
           maxHealth: 100,
           xp: 0,
+          abilityCooldownTicks: 0,
         },
       ],
       foods: [{ id: 'f1', foodId: 'berry', x: 300, y: 400 }],
       leaderboard: [{ nickname: 'Alice', xp: 0 }],
+      killEvents: [{ victimId: 'p2', killerId: 'p1', killerNickname: 'Alice', x: 100, y: 200, xpAwarded: 50 }],
+      abilityEvents: [{ playerId: 'p1', abilityId: 'dash', x: 100, y: 200, angle: 0 }],
     });
     const msg = parseServerMessage(json);
     expect(msg).not.toBeNull();
@@ -138,6 +151,9 @@ describe('parseServerMessage', () => {
       expect(msg.foods).toHaveLength(1);
       expect(msg.foods[0].foodId).toBe('berry');
       expect(msg.leaderboard).toHaveLength(1);
+      expect(msg.players[0].abilityCooldownTicks).toBe(0);
+      expect(msg.killEvents).toHaveLength(1);
+      expect(msg.abilityEvents).toHaveLength(1);
     }
   });
 
@@ -298,6 +314,7 @@ describe('parseServerMessage', () => {
       createInputMessage(1, 0.5, 1.0, false, false),
       createEvolveMessage('fox'),
       createPingMessage(),
+      createGridDebugMessage(false),
     ];
 
     for (const msg of messages) {

@@ -18,6 +18,7 @@ public final class ProtocolConstants {
     public static final String TYPE_INPUT = "input";
     public static final String TYPE_EVOLVE = "evolve";
     public static final String TYPE_PING = "ping";
+    public static final String TYPE_GRID_DEBUG = "grid_debug";
 
     // ------------------------------------------------------------------ Server → Client message types
     public static final String TYPE_WELCOME = "welcome";

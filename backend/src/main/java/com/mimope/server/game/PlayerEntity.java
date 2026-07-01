@@ -30,6 +30,13 @@ public class PlayerEntity {
     // Lifecycle
     private boolean alive = true;
 
+    // Evolution
+    private boolean evolutionOptionsSent = false;
+
+    // Ability: first MVP ability is a short dash.
+    private static final long ABILITY_COOLDOWN_TICKS = 100;
+    private long lastAbilityTick = -ABILITY_COOLDOWN_TICKS;
+
     public PlayerEntity(String id, String nickname, AnimalDefinition animal, double x, double y) {
         this.id = id;
         this.nickname = nickname;
@@ -71,6 +78,14 @@ public class PlayerEntity {
      * @param worldHeight world height for clamping
      */
     public void applyMovement(InputMessage input, double deltaTime, double worldWidth, double worldHeight) {
+        applyMovement(input, deltaTime, worldWidth, worldHeight, 1.0);
+    }
+
+    public void applyMovement(InputMessage input,
+                              double deltaTime,
+                              double worldWidth,
+                              double worldHeight,
+                              double speedMultiplier) {
         double speed = animal.speed();
         double intensity = input.intensity();
 
@@ -78,6 +93,7 @@ public class PlayerEntity {
         if (input.boost()) {
             speed *= 1.5;
         }
+        speed *= speedMultiplier;
 
         double moveAngle = input.angle();
         double dx = Math.cos(moveAngle) * speed * intensity * deltaTime;
@@ -99,13 +115,56 @@ public class PlayerEntity {
         this.xp += amount;
     }
 
+    public void damage(double amount) {
+        this.health = Math.max(0, this.health - amount);
+        if (this.health <= 0) {
+            kill();
+        }
+    }
+
     public void setAnimal(AnimalDefinition animal) {
         this.animal = animal;
         this.health = animal.maxHealth();
+        this.evolutionOptionsSent = false;
+    }
+
+    public boolean canEvolveTo(AnimalDefinition target) {
+        if (target == null) {
+            return false;
+        }
+        return animal.evolutionOptions().stream().anyMatch(option -> option.id().equals(target.id()))
+                && xp >= target.xpRequired();
+    }
+
+    public boolean shouldSendEvolutionOptions() {
+        return !evolutionOptionsSent && !getAvailableEvolutionOptions().isEmpty();
+    }
+
+    public void markEvolutionOptionsSent() {
+        this.evolutionOptionsSent = true;
+    }
+
+    public java.util.List<AnimalDefinition> getAvailableEvolutionOptions() {
+        return animal.evolutionOptions().stream()
+                .filter(option -> xp >= option.xpRequired())
+                .toList();
     }
 
     public void kill() {
         this.alive = false;
+        this.pendingInput = null;
+    }
+
+    public boolean canUseAbility(long currentTick) {
+        return currentTick - lastAbilityTick >= ABILITY_COOLDOWN_TICKS;
+    }
+
+    public void markAbilityUsed(long currentTick) {
+        this.lastAbilityTick = currentTick;
+    }
+
+    public long getAbilityCooldownRemainingTicks(long currentTick) {
+        return Math.max(0, ABILITY_COOLDOWN_TICKS - (currentTick - lastAbilityTick));
     }
 
     // ------------------------------------------------------------------ getters

@@ -56,13 +56,22 @@ public class FoodSpawnService {
         int deficit = maxFood - currentFoods.size();
         if (deficit <= 0) return;
 
-        List<FoodDefinition> allFoods = new ArrayList<>(FoodDefinition.all().values());
-        int totalWeight = FoodDefinition.totalSpawnWeight();
-
         for (int i = 0; i < deficit; i++) {
-            FoodDefinition chosen = pickWeightedRandom(allFoods, totalWeight);
-            double x = randomRange(chosen.radius(), worldWidth - chosen.radius());
-            double y = randomRange(chosen.radius(), worldHeight - chosen.radius());
+            double x = randomRange(0, worldWidth);
+            double y = randomRange(0, worldHeight);
+            Biome biome = biomeAt(x, y);
+            List<FoodDefinition> biomeFoods = FoodDefinition.all().values().stream()
+                    .filter(food -> food.biome() == biome)
+                    .toList();
+            if (biomeFoods.isEmpty()) {
+                biomeFoods = FoodDefinition.all().values().stream()
+                        .filter(food -> food.biome() == Biome.LAND)
+                        .toList();
+            }
+
+            FoodDefinition chosen = pickWeightedRandom(biomeFoods, totalWeight(biomeFoods));
+            x = Math.max(chosen.radius(), Math.min(worldWidth - chosen.radius(), x));
+            y = Math.max(chosen.radius(), Math.min(worldHeight - chosen.radius(), y));
 
             String instanceId = "f" + idCounter.incrementAndGet();
             FoodEntity food = new FoodEntity(instanceId, chosen, x, y);
@@ -120,6 +129,20 @@ public class FoodSpawnService {
             }
         }
         return foods.get(0);
+    }
+
+    private int totalWeight(List<FoodDefinition> foods) {
+        return foods.stream().mapToInt(FoodDefinition::spawnWeight).sum();
+    }
+
+    private Biome biomeAt(double x, double y) {
+        if (x < worldWidth * 0.28) {
+            return Biome.OCEAN;
+        }
+        if (y > worldHeight * 0.64) {
+            return Biome.ARCTIC;
+        }
+        return Biome.LAND;
     }
 
     private static double randomRange(double min, double max) {

@@ -1,9 +1,11 @@
 package com.mimope.server.websocket;
 
 import com.mimope.server.game.GameRoom;
+import com.mimope.server.game.GameWorld;
 import com.mimope.server.game.PlayerEntity;
 import com.mimope.server.protocol.ProtocolConstants;
 import com.mimope.server.protocol.inbound.EvolveMessage;
+import com.mimope.server.protocol.inbound.GridDebugMessage;
 import com.mimope.server.protocol.inbound.InputMessage;
 import com.mimope.server.protocol.inbound.JoinMessage;
 import com.mimope.server.protocol.inbound.PingMessage;
@@ -98,6 +100,11 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             log.warn("Received message from unregistered session: {}", sessionId);
             return;
         }
+        if (!clientSession.allowMessage()) {
+            log.debug("Rate limit exceeded for session {}", sessionId);
+            sendError(clientSession, "Too many messages.");
+            return;
+        }
 
         Optional<InboundMessage> decoded = messageDecoder.decode(message.getPayload());
         if (decoded.isEmpty()) {
@@ -112,6 +119,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             case ProtocolConstants.TYPE_INPUT  -> handleInput(clientSession, msg);
             case ProtocolConstants.TYPE_EVOLVE -> handleEvolve(clientSession, msg);
             case ProtocolConstants.TYPE_PING   -> handlePing(clientSession, msg);
+            case ProtocolConstants.TYPE_GRID_DEBUG -> handleGridDebug(clientSession, msg);
             default                            -> handleUnknown(clientSession, msg);
         }
     }
@@ -171,8 +179,14 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             sendError(session, "Malformed evolve message: missing animalId.");
             return;
         }
-        // Evolution will be validated and applied in Phase 12.
-        log.debug("Evolve request from {}: animalId='{}'", session.getId(), evolve.animalId());
+
+        GameWorld.EvolutionResult result = gameRoom.getWorld().evolvePlayer(session.getId(), evolve.animalId());
+        if (!result.success()) {
+            sendError(session, result.error());
+            return;
+        }
+
+        log.info("Player evolved: session={}, animalId='{}'", session.getId(), evolve.animalId());
     }
 
     private void handlePing(ClientSession session, InboundMessage msg) {
@@ -181,6 +195,17 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         PingMessage ping = PingMessage.from(msg);
         PongMessage pong = new PongMessage(ping.timestamp());
         messageEncoder.send(session, PongMessage.TYPE, pong.toMap());
+    }
+
+    private void handleGridDebug(ClientSession session, InboundMessage msg) {
+        GridDebugMessage gridDebug = GridDebugMessage.from(msg);
+        if (gridDebug == null) {
+            sendError(session, "Malformed grid_debug message: missing enabled.");
+            return;
+        }
+
+        gameRoom.setGridDebugEnabled(gridDebug.enabled());
+        log.debug("Grid debug {} by session {}", gridDebug.enabled() ? "enabled" : "disabled", session.getId());
     }
 
     private void handleUnknown(ClientSession session, InboundMessage msg) {

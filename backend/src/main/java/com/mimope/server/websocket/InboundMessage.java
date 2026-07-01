@@ -35,4 +35,14 @@ public record InboundMessage(
         Object v = payload.get(key);
         return v instanceof Number n ? n : null;
     }
+
+    /**
+     * Convenience accessor for a boolean payload field.
+     *
+     * @return the value cast to Boolean, or {@code null} if absent or wrong type
+     */
+    public Boolean getBoolean(String key) {
+        Object v = payload.get(key);
+        return v instanceof Boolean b ? b : null;
+    }
 }

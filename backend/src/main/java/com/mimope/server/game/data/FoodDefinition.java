@@ -52,6 +52,12 @@ public record FoodDefinition(
         map.put("watermelon", new FoodDefinition(
                 "watermelon", "Watermelon", 80, 20, 4, Biome.LAND, 5));
 
+        map.put("seaweed", new FoodDefinition(
+                "seaweed", "Seaweed", 20, 14, 1, Biome.OCEAN, 35));
+
+        map.put("arctic_berry", new FoodDefinition(
+                "arctic_berry", "Arctic Berry", 12, 10, 1, Biome.ARCTIC, 35));
+
         REGISTRY = Collections.unmodifiableMap(map);
     }
 

@@ -105,11 +105,27 @@ interface FoodPickupEffect {
   worldX: number;
 }
 
+interface EvolutionEffect {
+  ring: Graphics;
+  ttl: number;
+  worldX: number;
+  worldY: number;
+  radius: number;
+}
+
+interface TimedGraphicEffect {
+  graphic: Graphics;
+  ttl: number;
+  maxTtl: number;
+}
+
 /** Duration of the pickup effect in seconds. */
 const PICKUP_EFFECT_DURATION = 0.8;
 
 /** How many pixels the text floats upward over its lifetime. */
 const PICKUP_EFFECT_FLOAT_DISTANCE = 40;
+
+const EVOLUTION_EFFECT_DURATION = 0.9;
 
 // ---------------------------------------------------------------------------
 // PixiGame class
@@ -141,9 +157,12 @@ export class PixiGame {
   // Rendered entities
   private playerSprites: Map<string, PlayerRenderState> = new Map();
   private foodSprites: Map<string, FoodRenderState> = new Map();
+  private foodSpritePool: Sprite[] = [];
 
   // Food pickup visual effects
   private pickupEffects: FoodPickupEffect[] = [];
+  private evolutionEffects: EvolutionEffect[] = [];
+  private timedGraphicEffects: TimedGraphicEffect[] = [];
 
   // Grid debug graphics
   private gridDebugGraphics: Graphics | null = null;
@@ -263,6 +282,7 @@ export class PixiGame {
     // Clear sprite maps
     this.playerSprites.clear();
     this.foodSprites.clear();
+    this.foodSpritePool = [];
   }
 
   /** Get the snapshot callback to wire into GameConnection. */
@@ -345,6 +365,22 @@ export class PixiGame {
     // Solid green background
     bg.rect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     bg.fill(0x1a5c2a);
+
+    // Ocean biome on the west side
+    bg.rect(0, 0, WORLD_WIDTH * 0.28, WORLD_HEIGHT);
+    bg.fill({ color: 0x1d4ed8, alpha: 0.85 });
+
+    // Arctic biome across the southern map
+    bg.rect(WORLD_WIDTH * 0.28, WORLD_HEIGHT * 0.64, WORLD_WIDTH * 0.72, WORLD_HEIGHT * 0.36);
+    bg.fill({ color: 0xdbeafe, alpha: 0.75 });
+
+    // River visual crossing land
+    bg.rect(WORLD_WIDTH * 0.28, WORLD_HEIGHT * 0.42, WORLD_WIDTH * 0.72, 150);
+    bg.fill({ color: 0x38bdf8, alpha: 0.55 });
+
+    // Healing-stone placeholder
+    bg.circle(WORLD_WIDTH * 0.62, WORLD_HEIGHT * 0.52, 42);
+    bg.fill({ color: 0xa7f3d0, alpha: 0.7 });
 
     // Grid lines
     bg.setStrokeStyle({ width: 1, color: 0x1e6b30, alpha: 0.5 });
@@ -439,6 +475,18 @@ export class PixiGame {
     if (msg.foodPickups && msg.foodPickups.length > 0) {
       for (const pickup of msg.foodPickups) {
         this.spawnPickupEffect(pickup.x, pickup.y, pickup.xp);
+      }
+    }
+    if (msg.killEvents && msg.killEvents.length > 0) {
+      for (const kill of msg.killEvents) {
+        this.spawnKillEffect(kill.x, kill.y, kill.xpAwarded);
+      }
+    }
+    if (msg.abilityEvents && msg.abilityEvents.length > 0) {
+      for (const ability of msg.abilityEvents) {
+        if (ability.abilityId === 'dash') {
+          this.spawnDashEffect(ability.x, ability.y, ability.angle);
+        }
       }
     }
   }
@@ -629,6 +677,7 @@ export class PixiGame {
 
     // Update name label position
     state.nameLabel.position.set(0, -newRadius - 14);
+    this.spawnEvolutionEffect(state.displayX, state.displayY, newRadius);
   }
 
   // -----------------------------------------------------------------------
@@ -652,7 +701,8 @@ export class PixiGame {
     for (const [id, state] of this.foodSprites) {
       if (!seenIds.has(id)) {
         this.layerFood.removeChild(state.sprite);
-        state.sprite.destroy();
+        state.sprite.visible = false;
+        this.foodSpritePool.push(state.sprite);
         this.foodSprites.delete(id);
       }
     }
@@ -664,18 +714,28 @@ export class PixiGame {
     const key = foodImageKey(f.foodId);
     const texture = Assets.get<Texture>(key);
 
-    let sprite: Sprite;
+    let sprite = this.foodSpritePool.pop();
     if (texture) {
-      sprite = new Sprite(texture);
+      if (sprite) {
+        sprite.texture = texture;
+      } else {
+        sprite = new Sprite(texture);
+      }
     } else {
       const g = new Graphics();
       g.circle(0, 0, radius);
       g.fill(0xef4444);
       const fallbackTexture = this.app.renderer.generateTexture(g);
-      sprite = new Sprite(fallbackTexture);
+      if (sprite) {
+        sprite.texture = fallbackTexture;
+      } else {
+        sprite = new Sprite(fallbackTexture);
+      }
       g.destroy();
     }
 
+    sprite.visible = true;
+    sprite.alpha = 1;
     sprite.anchor.set(0.5);
     sprite.width = radius * 2;
     sprite.height = radius * 2;
@@ -749,6 +809,97 @@ export class PixiGame {
     }
   }
 
+  private spawnEvolutionEffect(worldX: number, worldY: number, radius: number): void {
+    const ring = new Graphics();
+    ring.position.set(worldX, worldY);
+    this.layerEffects.addChild(ring);
+
+    this.evolutionEffects.push({
+      ring,
+      ttl: EVOLUTION_EFFECT_DURATION,
+      worldX,
+      worldY,
+      radius,
+    });
+  }
+
+  private updateEvolutionEffects(dt: number): void {
+    for (let i = this.evolutionEffects.length - 1; i >= 0; i--) {
+      const effect = this.evolutionEffects[i];
+      effect.ttl -= dt;
+
+      if (effect.ttl <= 0) {
+        this.layerEffects.removeChild(effect.ring);
+        effect.ring.destroy();
+        this.evolutionEffects.splice(i, 1);
+        continue;
+      }
+
+      const progress = 1 - effect.ttl / EVOLUTION_EFFECT_DURATION;
+      const radius = effect.radius + progress * 45;
+      effect.ring.clear();
+      effect.ring.circle(0, 0, radius);
+      effect.ring.stroke({
+        width: 5 * (1 - progress),
+        color: 0xfacc15,
+        alpha: 1 - progress,
+      });
+      effect.ring.position.set(effect.worldX, effect.worldY);
+    }
+  }
+
+  private spawnKillEffect(worldX: number, worldY: number, xpAwarded: number): void {
+    const style = new TextStyle({
+      fontSize: 20,
+      fontWeight: 'bold',
+      fill: 0xef4444,
+      stroke: { color: 0xffffff, width: 3 },
+    });
+    const text = new Text({ text: `KO +${Math.round(xpAwarded)}`, style });
+    text.anchor.set(0.5);
+    text.position.set(worldX, worldY - 20);
+    this.layerEffects.addChild(text);
+
+    this.pickupEffects.push({
+      text,
+      ttl: PICKUP_EFFECT_DURATION,
+      startY: worldY - 20,
+      worldX,
+    });
+  }
+
+  private spawnDashEffect(worldX: number, worldY: number, angle: number): void {
+    const graphic = new Graphics();
+    const tailLength = 90;
+    const endX = -Math.cos(angle) * tailLength;
+    const endY = -Math.sin(angle) * tailLength;
+
+    graphic.position.set(worldX, worldY);
+    graphic.setStrokeStyle({ width: 12, color: 0xfacc15, alpha: 0.65 });
+    graphic.moveTo(0, 0);
+    graphic.lineTo(endX, endY);
+    graphic.stroke();
+    this.layerEffects.addChild(graphic);
+
+    this.timedGraphicEffects.push({ graphic, ttl: 0.35, maxTtl: 0.35 });
+  }
+
+  private updateTimedGraphicEffects(dt: number): void {
+    for (let i = this.timedGraphicEffects.length - 1; i >= 0; i--) {
+      const effect = this.timedGraphicEffects[i];
+      effect.ttl -= dt;
+
+      if (effect.ttl <= 0) {
+        this.layerEffects.removeChild(effect.graphic);
+        effect.graphic.destroy();
+        this.timedGraphicEffects.splice(i, 1);
+        continue;
+      }
+
+      effect.graphic.alpha = effect.ttl / effect.maxTtl;
+    }
+  }
+
   // -----------------------------------------------------------------------
   // Render loop
   // -----------------------------------------------------------------------
@@ -759,10 +910,12 @@ export class PixiGame {
     const dt = ticker.deltaMS / 1000;
 
     this.syncLatestStoreSnapshot();
-    this.interpolatePlayers(dt);
+    this.interpolatePlayers();
     this.updateHealthBars();
     this.updatePickupEffects(dt);
-    this.updateCamera(dt);
+    this.updateEvolutionEffects(dt);
+    this.updateTimedGraphicEffects(dt);
+    this.updateCamera();
     this.updateGridDebug();
     this.updateFps(ticker.deltaMS);
   };
@@ -775,7 +928,7 @@ export class PixiGame {
     const gridDebug = useGameStore.getState().gridDebug;
     if (!gridDebug || gridDebug.length === 0) {
       if (this.gridDebugGraphics) {
-        this.layerDebug.removeChild(this.gridDebugGraphics);
+        this.gridDebugGraphics.parent?.removeChild(this.gridDebugGraphics);
         this.gridDebugGraphics.destroy({ children: true });
         this.gridDebugGraphics = null;
       }
@@ -789,7 +942,7 @@ export class PixiGame {
 
     if (!this.gridDebugGraphics) {
       this.gridDebugGraphics = new Graphics();
-      this.layerDebug.addChild(this.gridDebugGraphics);
+      this.worldContainer.addChild(this.gridDebugGraphics);
     }
 
     const g = this.gridDebugGraphics;
@@ -845,7 +998,7 @@ export class PixiGame {
   // Interpolation — smoothly move sprites toward server positions
   // -----------------------------------------------------------------------
 
-  private interpolatePlayers(_dt: number): void {
+  private interpolatePlayers(): void {
     for (const [, state] of this.playerSprites) {
       // Lerp position
       state.displayX += (state.targetX - state.displayX) * INTERP_SPEED;
@@ -895,7 +1048,7 @@ export class PixiGame {
   // Camera
   // -----------------------------------------------------------------------
 
-  private updateCamera(_dt: number): void {
+  private updateCamera(): void {
     // Follow the local player
     const localPlayerId = useGameStore.getState().localPlayerId;
     if (localPlayerId) {
