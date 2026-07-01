@@ -1,0 +1,26 @@
+services:
+  frontend:
+    image: node:24-alpine
+    working_dir: /app/frontend
+    command: sh -c "npm install && npm run dev"
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - frontend-node-modules:/app/frontend/node_modules
+    depends_on:
+      - backend
+
+  backend:
+    image: maven:3.9-eclipse-temurin-17
+    working_dir: /app/backend
+    command: mvn spring-boot:run
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/app
+      - maven-cache:/root/.m2
+
+volumes:
+  frontend-node-modules:
+  maven-cache:

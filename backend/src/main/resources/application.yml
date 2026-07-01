@@ -1,0 +1,32 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: mimope-server
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+game:
+  world:
+    width: 5000
+    height: 5000
+    max-food: 200
+  room:
+    max-players: 50
+  loop:
+    tick-rate: 20
+
+logging:
+  level:
+    com.mimope.server: INFO
+    com.mimope.server.websocket: DEBUG
+    com.mimope.server.game: DEBUG
