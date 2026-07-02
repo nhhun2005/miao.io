@@ -350,10 +350,10 @@ Recommended default decisions:
 - [x] Add frontend tests for stores.
 - [x] Add manual multiplayer test checklist.
 - [x] Add load test script for fake clients.
-- [ ] Test reconnect behavior.
+- [x] Test reconnect behavior.
 - [x] Test malformed messages.
-- [ ] Test browser refresh while connected.
-- [ ] Test two or more players in same room.
+- [x] Test browser refresh while connected.
+- [x] Test two or more players in same room.
 
 ---
 
@@ -369,7 +369,7 @@ Recommended default decisions:
 - [x] Add production environment variables.
 - [x] Add health checks.
 - [x] Add deployment instructions to `README.md`.
-- [ ] Verify clean clone setup works.
+- [x] Verify clean clone setup works.
 
 ---
 
@@ -379,13 +379,14 @@ Recommended default decisions:
 - [x] Run full frontend test suite.
 - [x] Run lint and formatting.
 - [x] Run local full-stack smoke test.
-- [ ] Test multiplayer with at least two browser sessions.
-- [ ] Test death and respawn.
-- [ ] Test evolution.
-- [ ] Test leaderboard.
+- [x] Test multiplayer with at least two browser sessions.
+- [x] Test death and respawn.
+- [x] Test evolution.
+- [x] Test leaderboard.
 - [x] Test asset loading after production build.
 - [x] Fix critical bugs.
 - [x] Create first playable release notes.
+
 
 ---
 

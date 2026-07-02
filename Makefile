@@ -1,4 +1,4 @@
-.PHONY: frontend-install frontend-dev frontend-build frontend-lint frontend-test backend-test backend-dev compose-up compose-down check-ids load-test
+.PHONY: frontend-install frontend-dev frontend-build frontend-lint frontend-test backend-test backend-dev compose-up compose-down check-ids load-test verify-clean-clone
 
 frontend-install:
 	cd frontend && npm install
@@ -32,3 +32,6 @@ check-ids:
 
 load-test:
 	node scripts/load-test.mjs
+
+verify-clean-clone:
+	bash scripts/verify-clean-clone.sh

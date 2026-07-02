@@ -61,6 +61,8 @@ export class GameConnection {
   private lastNickname: string | null = null;
   private reconnectAttempts = 0;
   private readonly maxReconnectAttempts = 3;
+  private died = false;
+
 
   constructor(callbacks: GameConnectionCallbacks = {}) {
     this.callbacks = callbacks;
@@ -197,12 +199,17 @@ export class GameConnection {
     const previousState = this.state;
 
     if (!this.destroyed) {
-      if (previousState === 'joined' || previousState === 'reconnecting') {
+      if (this.died) {
+        // The server closed the socket after killing this player. This is an
+        // expected close, not a network failure — do not attempt to reconnect.
+        this.setState('disconnected');
+      } else if (previousState === 'joined' || previousState === 'reconnecting') {
         this.scheduleReconnect();
       } else {
         this.setState('disconnected');
       }
     }
+
   };
 
   private onWsError = (event: Event): void => {
@@ -260,7 +267,11 @@ export class GameConnection {
 
   private handleDeath(msg: DeathMessage): void {
     console.log('[GameConnection] Death:', msg.reason);
+    // Mark this as an expected close so a subsequent socket close does not
+    // trigger reconnect attempts or a "failed to connect" error.
+    this.died = true;
     useUIStore.getState().showDeath(
+
       msg.killerNickname
         ? `${msg.reason} by ${msg.killerNickname}`
         : msg.reason,

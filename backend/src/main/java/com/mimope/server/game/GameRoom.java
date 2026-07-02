@@ -114,6 +114,14 @@ public class GameRoom {
     }
 
     /**
+     * Force-kill a player (test support). Emits a death event so the victim's
+     * client receives a death message on the next snapshot broadcast.
+     */
+    public boolean forceKill(String playerId) {
+        return world.forceKill(playerId);
+    }
+
+    /**
      * Queue a player input for processing on the next tick.
      */
     public void queueInput(String playerId, InputMessage input) {

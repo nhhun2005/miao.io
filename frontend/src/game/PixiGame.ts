@@ -136,6 +136,8 @@ export class PixiGame {
   private container: HTMLElement;
   private connection: GameConnection;
   private destroyed = false;
+  /** True only once app.init() has fully resolved. */
+  private appReady = false;
 
   // Rendering layers (added to stage in order)
   private layerBackground!: Container;
@@ -219,8 +221,11 @@ export class PixiGame {
       resolution: window.devicePixelRatio || 1,
     });
 
+    // The Application is now fully initialized; destroy() is safe from here.
+    this.appReady = true;
+
     if (this.destroyed) {
-      this.app.destroy(true);
+      this.safeDestroyApp();
       return;
     }
 
@@ -234,7 +239,7 @@ export class PixiGame {
     await this.loadAssets();
 
     if (this.destroyed) {
-      this.app.destroy(true);
+      this.safeDestroyApp();
       return;
     }
 
@@ -265,15 +270,7 @@ export class PixiGame {
     useInputStore.getState().reset();
 
     if (this.app) {
-      this.app.ticker.remove(this.onTick);
-
-      // Remove canvas from DOM
-      const canvas = this.app.canvas as HTMLCanvasElement;
-      if (canvas.parentElement) {
-        canvas.parentElement.removeChild(canvas);
-      }
-
-      this.app.destroy(true, { children: true, texture: true });
+      this.safeDestroyApp();
     }
 
     // Remove wheel listener
@@ -284,6 +281,47 @@ export class PixiGame {
     this.foodSprites.clear();
     this.foodSpritePool = [];
   }
+
+  /**
+   * Destroy the PixiJS Application defensively.
+   *
+   * PixiJS v8 throws (e.g. "this._cancelResize is not a function") when
+   * destroy() runs on an Application whose init() has not fully wired up its
+   * systems, or when destroy() is invoked twice. Because destroy() is called
+   * from React's synchronous unmount commit (for example when a death event
+   * flips the active screen), an unguarded throw here aborts the commit and
+   * prevents the next screen from mounting. Guarding keeps unmount safe.
+   */
+  private safeDestroyApp(): void {
+    if (!this.app) return;
+
+    try {
+      this.app.ticker?.remove(this.onTick);
+    } catch {
+      // Ticker may not exist yet on a partially-initialized app.
+    }
+
+    // Remove canvas from DOM if it was mounted.
+    try {
+      const canvas = this.app.canvas as HTMLCanvasElement | undefined;
+      if (canvas?.parentElement) {
+        canvas.parentElement.removeChild(canvas);
+      }
+    } catch {
+      // Canvas may not have been created on a partially-initialized app.
+    }
+
+    if (this.appReady) {
+      try {
+        this.app.destroy(true, { children: true, texture: true });
+      } catch (err) {
+        console.warn('[PixiGame] Error while destroying PixiJS app:', err);
+      }
+    }
+
+    this.appReady = false;
+  }
+
 
   /** Get the snapshot callback to wire into GameConnection. */
   get onSnapshot(): (msg: SnapshotMessage) => void {

@@ -31,12 +31,16 @@ export function LoadingScreen() {
           setScreen('game');
         }
         if (state === 'disconnected') {
-          // Connection failed or closed before join
-          if (connectionRef.current) {
+          // Only treat a disconnect as a fatal connect failure while the
+          // loading screen is still the active screen. Once we've moved on
+          // to the game or death screen, socket closes (e.g. after a death)
+          // are handled elsewhere and must not clobber those screens.
+          if (connectionRef.current && useUIStore.getState().screen === 'loading') {
             setError('Failed to connect to game server.');
             setScreen('home');
           }
         }
+
       },
       onError: (message) => {
         setError(message);

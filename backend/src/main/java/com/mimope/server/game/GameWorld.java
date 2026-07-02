@@ -53,6 +53,14 @@ public class GameWorld {
     /** Ability events emitted during the current tick. */
     private final List<AbilityEvent> abilityEvents = new ArrayList<>();
 
+    /**
+     * Player IDs queued for a forced kill from outside the tick thread
+     * (test support only). Drained at the start of each tick so the resulting
+     * death event is broadcast in the same tick, avoiding a race with the
+     * per-tick event clear.
+     */
+    private final java.util.Queue<String> pendingForceKills = new java.util.concurrent.ConcurrentLinkedQueue<>();
+
     /** Spatial grid for efficient collision and visibility queries. */
     private final SpatialGrid spatialGrid;
 
@@ -90,6 +98,10 @@ public class GameWorld {
         evolutionOptionsEvents.clear();
         deathEvents.clear();
         abilityEvents.clear();
+
+        // Drain any externally-requested forced kills (test support) so their
+        // death events are emitted within this tick's event window.
+        drainForceKills();
 
         // 1. Process player inputs and apply movement
         for (PlayerEntity player : players.values()) {
@@ -420,6 +432,48 @@ public class GameWorld {
 
     public List<AbilityEvent> getAbilityEvents() {
         return Collections.unmodifiableList(abilityEvents);
+    }
+
+    /**
+     * Force a player to die and emit a death event so the victim's client
+     * receives a death message on the next broadcast. Intended for test
+     * support only; normal deaths flow through {@link #checkPlayerPredation()}.
+     *
+     * <p>The kill is queued and applied at the start of the next tick (inside
+     * {@link #tick(double)}), so the resulting death event is emitted within
+     * that tick's event window rather than racing the per-tick event clear.
+     *
+     * @return {@code true} if the player currently exists and is alive
+     */
+    public boolean forceKill(String playerId) {
+        PlayerEntity victim = players.get(playerId);
+        if (victim == null || !victim.isAlive()) {
+            return false;
+        }
+        pendingForceKills.add(playerId);
+        return true;
+    }
+
+    /** Apply any queued forced kills, emitting death events for each. */
+    private void drainForceKills() {
+        String playerId;
+        while ((playerId = pendingForceKills.poll()) != null) {
+            PlayerEntity victim = players.get(playerId);
+            if (victim == null || !victim.isAlive()) {
+                continue;
+            }
+            victim.kill();
+            long spawnedAt = playerSpawnMs.getOrDefault(playerId, System.currentTimeMillis());
+            deathEvents.add(new DeathEvent(
+                    playerId,
+                    null,
+                    "Test",
+                    victim.getX(),
+                    victim.getY(),
+                    0.0,
+                    Math.max(0, System.currentTimeMillis() - spawnedAt)
+            ));
+        }
     }
 
     public EvolutionResult evolvePlayer(String playerId, String animalId) {

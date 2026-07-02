@@ -72,6 +72,15 @@ Run the fake-client WebSocket load test against a running backend:
 node scripts/load-test.mjs
 ```
 
+Verify a from-scratch build and test run (frontend build/test/lint + backend
+package/test) against a clean copy of the working tree:
+
+```sh
+make verify-clean-clone
+# or include a docker compose build:
+bash scripts/verify-clean-clone.sh --docker
+```
+
 ## Services
 
 - Frontend: http://localhost:5173
