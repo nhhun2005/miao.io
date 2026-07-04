@@ -43,6 +43,18 @@ class InboundMessageParsingTest {
             JoinMessage join = JoinMessage.from(raw);
             assertNotNull(join);
             assertEquals("Alice", join.nickname());
+            assertNull(join.starterAnimalId());
+        }
+
+        @Test
+        void parsesOptionalStarterAnimalId() {
+            InboundMessage raw = decode("""
+                    {"type":"join","nickname":"Alice","starterAnimalId":" shrimp "}
+                    """);
+            JoinMessage join = JoinMessage.from(raw);
+            assertNotNull(join);
+            assertEquals("Alice", join.nickname());
+            assertEquals("shrimp", join.starterAnimalId());
         }
 
         @Test

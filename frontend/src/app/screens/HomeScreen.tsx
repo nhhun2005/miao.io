@@ -2,10 +2,13 @@ import { useCallback } from "react";
 import { useUIStore } from "../../state/uiStore";
 import { Button, Panel } from "../../ui";
 import { MAX_NICKNAME_LENGTH, MIN_NICKNAME_LENGTH } from "../../config/env";
+import { ANIMALS, STARTER_ANIMAL_IDS } from "../../game/data/animals";
 
 export function HomeScreen() {
   const nickname = useUIStore((s) => s.nickname);
+  const starterAnimalId = useUIStore((s) => s.starterAnimalId);
   const setNickname = useUIStore((s) => s.setNickname);
+  const setStarterAnimalId = useUIStore((s) => s.setStarterAnimalId);
   const setScreen = useUIStore((s) => s.setScreen);
   const setError = useUIStore((s) => s.setError);
 
@@ -66,6 +69,24 @@ export function HomeScreen() {
             autoFocus
           />
         </label>
+
+        <div className="home-panel__starter-group" aria-label="Starter animal">
+          {STARTER_ANIMAL_IDS.map((animalId) => {
+            const animal = ANIMALS[animalId];
+            return (
+              <button
+                key={animalId}
+                type="button"
+                className={`home-panel__starter ${starterAnimalId === animalId ? "home-panel__starter--active" : ""}`}
+                onClick={() => setStarterAnimalId(animalId)}
+              >
+                <img src={`/${animal.skinPath}`} alt="" />
+                <span>{animal.name}</span>
+                <small>{animal.biome}</small>
+              </button>
+            );
+          })}
+        </div>
 
         <Button
           variant="primary"

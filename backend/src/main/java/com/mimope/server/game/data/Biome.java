@@ -4,8 +4,6 @@ package com.mimope.server.game.data;
  * Biome types available in the Mimope game world.
  * <p>
  * Each animal and food definition belongs to a specific biome.
- * Phase 2 only uses {@link #LAND}; ocean and arctic are defined
- * for forward compatibility.
  */
 public enum Biome {
 
@@ -16,7 +14,10 @@ public enum Biome {
     OCEAN,
 
     /** Arctic / ice biome. */
-    ARCTIC;
+    ARCTIC,
+
+    /** Final unlock tier that is not tied to one terrain biome. */
+    FINAL;
 
     /**
      * Return the lowercase string representation used in protocol messages.

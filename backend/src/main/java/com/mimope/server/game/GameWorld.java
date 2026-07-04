@@ -1,6 +1,7 @@
 package com.mimope.server.game;
 
 import com.mimope.server.game.data.AnimalDefinition;
+import com.mimope.server.game.data.AnimalVariantDefinition;
 import com.mimope.server.game.data.Biome;
 import com.mimope.server.game.data.FoodDefinition;
 import com.mimope.server.protocol.inbound.InputMessage;
@@ -67,7 +68,6 @@ public class GameWorld {
     /** Default visibility radius for snapshot filtering. */
     private static final double DEFAULT_VIEW_RADIUS = 2000.0;
     private static final double DASH_SPEED_MULTIPLIER = 3.0;
-    private static final String DASH_ABILITY_ID = "dash";
 
     private long tick = 0;
 
@@ -112,9 +112,9 @@ public class GameWorld {
                 double abilityMultiplier = 1.0;
                 if (input.ability() && player.canUseAbility(tick)) {
                     player.markAbilityUsed(tick);
-                    abilityMultiplier = DASH_SPEED_MULTIPLIER;
+                    abilityMultiplier = applyAbility(player, input);
                     abilityEvents.add(new AbilityEvent(
-                            player.getId(), DASH_ABILITY_ID, player.getX(), player.getY(), input.angle()));
+                            player.getId(), player.getAnimal().abilityId(), player.getX(), player.getY(), input.angle()));
                 }
                 double biomeMultiplier = movementMultiplierAt(player.getX(), player.getY());
                 player.applyMovement(input, deltaTime, width, height, abilityMultiplier * biomeMultiplier);
@@ -300,7 +300,7 @@ public class GameWorld {
                 if (predator == prey || !prey.isAlive() || killedThisTick.contains(prey.getId())) {
                     continue;
                 }
-                if (!predator.getAnimal().canEat(prey.getAnimal().id())) {
+                if (!predator.getAnimal().canEat(prey.getAnimal())) {
                     continue;
                 }
 
@@ -342,11 +342,18 @@ public class GameWorld {
      * @return the created player entity
      */
     public PlayerEntity spawnPlayer(String playerId, String nickname) {
-        AnimalDefinition starter = AnimalDefinition.starter();
+        return spawnPlayer(playerId, nickname, null);
+    }
+
+    public PlayerEntity spawnPlayer(String playerId, String nickname, String starterAnimalId) {
+        AnimalDefinition starter = AnimalDefinition.isValidStarter(starterAnimalId)
+                ? AnimalDefinition.byId(starterAnimalId == null || starterAnimalId.isBlank() ? "mouse" : starterAnimalId)
+                : AnimalDefinition.starter();
         double x = randomRange(starter.radius(), width - starter.radius());
         double y = randomRange(starter.radius(), height - starter.radius());
 
         PlayerEntity player = new PlayerEntity(playerId, nickname, starter, x, y);
+        player.setAnimal(starter, rollSkinId(starter));
         players.put(playerId, player);
         playerSpawnMs.put(playerId, System.currentTimeMillis());
 
@@ -491,7 +498,7 @@ public class GameWorld {
             return EvolutionResult.failure("Evolution is not available yet.");
         }
 
-        player.setAnimal(target);
+        player.setAnimal(target, rollSkinId(target));
         return EvolutionResult.success(player);
     }
 
@@ -530,11 +537,106 @@ public class GameWorld {
             case LAND -> 1.0;
             case OCEAN -> 0.78;
             case ARCTIC -> 0.86;
+            case FINAL -> 1.0;
         };
     }
 
     private static double randomRange(double min, double max) {
         return min + ThreadLocalRandom.current().nextDouble() * (max - min);
+    }
+
+    private double applyAbility(PlayerEntity player, InputMessage input) {
+        String abilityId = player.getAnimal().abilityId();
+        return switch (abilityId) {
+            case "charge" -> 3.2;
+            case "ice_slide" -> biomeAt(player.getX(), player.getY()) == Biome.ARCTIC ? 3.4 : 2.4;
+            case "burrow_dash", "dig_dash", "stink_dash", "forage_dash", "ink_dash",
+                    "snowball_dash", "fire_dash" -> DASH_SPEED_MULTIPLIER;
+            case "shell_guard", "inflate_guard" -> {
+                player.guardForTicks(tick, 40);
+                yield 0.55;
+            }
+            case "claw", "croc_bite", "back_kick" -> {
+                damagePlayersInArc(player, input.angle(), 150, Math.PI / 2, 90);
+                yield 1.0;
+            }
+            case "shock_pulse", "sting_pulse", "roar_pulse", "wave_pulse",
+                    "whirlpool_pulse", "freeze_pulse" -> {
+                damagePlayersInRadius(player, pulseRadius(abilityId), pulseDamage(abilityId));
+                yield 1.0;
+            }
+            default -> DASH_SPEED_MULTIPLIER;
+        };
+    }
+
+    private void damagePlayersInRadius(PlayerEntity source, double radius, double damage) {
+        for (PlayerEntity target : spatialGrid.queryPlayers(source.getX(), source.getY(), radius)) {
+            if (target == source || !target.isAlive() || !source.getAnimal().canEat(target.getAnimal())) {
+                continue;
+            }
+            double dx = source.getX() - target.getX();
+            double dy = source.getY() - target.getY();
+            double hitDistance = radius + target.getRadius();
+            if (dx * dx + dy * dy <= hitDistance * hitDistance) {
+                target.damage(damage, tick);
+            }
+        }
+    }
+
+    private void damagePlayersInArc(PlayerEntity source,
+                                    double angle,
+                                    double range,
+                                    double arcRadians,
+                                    double damage) {
+        for (PlayerEntity target : spatialGrid.queryPlayers(source.getX(), source.getY(), range)) {
+            if (target == source || !target.isAlive() || !source.getAnimal().canEat(target.getAnimal())) {
+                continue;
+            }
+            double dx = target.getX() - source.getX();
+            double dy = target.getY() - source.getY();
+            double distSq = dx * dx + dy * dy;
+            double hitDistance = range + target.getRadius();
+            if (distSq > hitDistance * hitDistance) {
+                continue;
+            }
+            double targetAngle = Math.atan2(dy, dx);
+            double diff = Math.abs(normalizeAngle(targetAngle - angle));
+            if (diff <= arcRadians / 2) {
+                target.damage(damage, tick);
+            }
+        }
+    }
+
+    private static double pulseRadius(String abilityId) {
+        return switch (abilityId) {
+            case "roar_pulse", "whirlpool_pulse", "freeze_pulse" -> 220;
+            case "wave_pulse" -> 200;
+            default -> 160;
+        };
+    }
+
+    private static double pulseDamage(String abilityId) {
+        return switch (abilityId) {
+            case "roar_pulse", "whirlpool_pulse", "freeze_pulse" -> 110;
+            case "wave_pulse" -> 100;
+            default -> 70;
+        };
+    }
+
+    private static double normalizeAngle(double angle) {
+        while (angle > Math.PI) angle -= Math.PI * 2;
+        while (angle < -Math.PI) angle += Math.PI * 2;
+        return angle;
+    }
+
+    private String rollSkinId(AnimalDefinition animal) {
+        for (AnimalVariantDefinition variant : AnimalVariantDefinition.all().values()) {
+            if (variant.baseAnimalId().equals(animal.id())
+                    && ThreadLocalRandom.current().nextDouble() < variant.rollRate()) {
+                return variant.id();
+            }
+        }
+        return animal.id();
     }
 
     public record EvolutionOptionsEvent(

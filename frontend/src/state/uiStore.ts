@@ -12,9 +12,11 @@ export interface UIState {
   error: string | null;
   /** Cause of death shown on the death screen. */
   deathMessage: string | null;
+  starterAnimalId: string;
 
   setScreen: (screen: Screen) => void;
   setNickname: (nickname: string) => void;
+  setStarterAnimalId: (starterAnimalId: string) => void;
   setError: (error: string | null) => void;
   showDeath: (message: string) => void;
   reset: () => void;
@@ -23,6 +25,7 @@ export interface UIState {
 const initialState = {
   screen: "home" as Screen,
   nickname: "",
+  starterAnimalId: "mouse",
   error: null as string | null,
   deathMessage: null as string | null,
 };
@@ -33,6 +36,8 @@ export const useUIStore = create<UIState>((set) => ({
   setScreen: (screen) => set({ screen }),
 
   setNickname: (nickname) => set({ nickname }),
+
+  setStarterAnimalId: (starterAnimalId) => set({ starterAnimalId }),
 
   setError: (error) => set({ error }),
 

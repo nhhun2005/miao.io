@@ -12,6 +12,7 @@ export function LoadingScreen() {
   const setScreen = useUIStore((s) => s.setScreen);
   const setError = useUIStore((s) => s.setError);
   const nickname = useUIStore((s) => s.nickname);
+  const starterAnimalId = useUIStore((s) => s.starterAnimalId);
   const connectionRef = useRef<GameConnection | null>(null);
 
   useEffect(() => {
@@ -22,7 +23,7 @@ export function LoadingScreen() {
       onStateChange: (state) => {
         if (state === 'connected') {
           // WebSocket is open — send join message
-          conn.join(nickname);
+          conn.join(nickname, starterAnimalId);
         }
         if (state === 'joined') {
           // Server accepted our join — store the connection globally and go to game

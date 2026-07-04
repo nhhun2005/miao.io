@@ -99,11 +99,15 @@ public class GameRoom {
      * @return the spawned player entity, or {@code null} if the room is full
      */
     public PlayerEntity addPlayer(String playerId, String nickname) {
+        return addPlayer(playerId, nickname, null);
+    }
+
+    public PlayerEntity addPlayer(String playerId, String nickname, String starterAnimalId) {
         if (world.getPlayerCount() >= maxPlayers) {
             log.warn("Room full ({}/{}), rejecting player '{}'", world.getPlayerCount(), maxPlayers, nickname);
             return null;
         }
-        return world.spawnPlayer(playerId, nickname);
+        return world.spawnPlayer(playerId, nickname, starterAnimalId);
     }
 
     /**
@@ -286,6 +290,7 @@ public class GameRoom {
                 p.getRadius(),
                 p.getAngle(),
                 p.getAnimal().id(),
+                p.getSkinId(),
                 p.getHealth(),
                 p.getMaxHealth(),
                 p.getXp(),

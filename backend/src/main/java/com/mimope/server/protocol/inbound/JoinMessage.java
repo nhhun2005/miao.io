@@ -14,7 +14,7 @@ import com.mimope.server.websocket.InboundMessage;
  *
  * @param nickname the requested display name (1–16 alphanumeric chars)
  */
-public record JoinMessage(String nickname) {
+public record JoinMessage(String nickname, String starterAnimalId) {
 
     public static final String TYPE = ProtocolConstants.TYPE_JOIN;
 
@@ -28,6 +28,7 @@ public record JoinMessage(String nickname) {
         if (nickname == null || nickname.isBlank()) {
             return null;
         }
-        return new JoinMessage(nickname.trim());
+        String starterAnimalId = raw.getString("starterAnimalId");
+        return new JoinMessage(nickname.trim(), starterAnimalId == null ? null : starterAnimalId.trim());
     }
 }

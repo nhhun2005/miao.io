@@ -143,7 +143,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         String nickname = validNickname.get();
 
         // Spawn the player in the game world
-        PlayerEntity player = gameRoom.addPlayer(session.getId(), nickname);
+        PlayerEntity player = gameRoom.addPlayer(session.getId(), nickname, join.starterAnimalId());
         if (player == null) {
             log.warn("Join rejected – room full for session {}", session.getId());
             sendError(session, "Room is full. Please try again later.");

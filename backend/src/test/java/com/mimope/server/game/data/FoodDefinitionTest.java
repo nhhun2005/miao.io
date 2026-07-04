@@ -15,7 +15,7 @@ class FoodDefinitionTest {
     @Test
     void registryContainsAllFirstPlayableFoods() {
         Map<String, FoodDefinition> all = FoodDefinition.all();
-        assertEquals(7, all.size());
+        assertEquals(9, all.size());
         assertNotNull(all.get("berry"));
         assertNotNull(all.get("banana"));
         assertNotNull(all.get("meat"));
@@ -23,6 +23,8 @@ class FoodDefinitionTest {
         assertNotNull(all.get("watermelon"));
         assertNotNull(all.get("seaweed"));
         assertNotNull(all.get("arctic_berry"));
+        assertNotNull(all.get("snail"));
+        assertNotNull(all.get("snail2"));
     }
 
     @Test
@@ -41,7 +43,7 @@ class FoodDefinitionTest {
     @Test
     void allIdsReturnsCorrectList() {
         List<String> ids = FoodDefinition.allIds();
-        assertEquals(7, ids.size());
+        assertEquals(9, ids.size());
         assertTrue(ids.contains("berry"));
         assertTrue(ids.contains("banana"));
         assertTrue(ids.contains("meat"));
@@ -49,12 +51,14 @@ class FoodDefinitionTest {
         assertTrue(ids.contains("watermelon"));
         assertTrue(ids.contains("seaweed"));
         assertTrue(ids.contains("arctic_berry"));
+        assertTrue(ids.contains("snail"));
+        assertTrue(ids.contains("snail2"));
     }
 
     @Test
     void totalSpawnWeightIsCorrect() {
-        // 50 + 30 + 10 + 20 + 5 + 35 + 35 = 185
-        assertEquals(185, FoodDefinition.totalSpawnWeight());
+        // 50 + 30 + 10 + 20 + 5 + 35 + 35 + 8 + 0 = 193
+        assertEquals(193, FoodDefinition.totalSpawnWeight());
     }
 
     @Test
@@ -89,7 +93,7 @@ class FoodDefinitionTest {
         for (FoodDefinition food : FoodDefinition.all().values()) {
             assertTrue(food.xp() > 0, food.id() + " xp should be positive");
             assertTrue(food.radius() > 0, food.id() + " radius should be positive");
-            assertTrue(food.spawnWeight() > 0, food.id() + " spawnWeight should be positive");
+            assertTrue(food.spawnWeight() >= 0, food.id() + " spawnWeight should be non-negative");
             assertTrue(food.minTier() >= 1, food.id() + " minTier should be >= 1");
         }
     }

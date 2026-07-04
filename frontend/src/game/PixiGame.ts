@@ -19,7 +19,7 @@ import {
   Ticker,
 } from 'pixi.js';
 
-import { ANIMALS } from './data/animals';
+import { ANIMALS, ANIMAL_VARIANTS } from './data/animals';
 import { FOODS } from './data/foods';
 import {
   buildAssetManifest,
@@ -82,6 +82,7 @@ interface PlayerRenderState {
   targetAngle: number;
   // Data
   animalId: string;
+  skinId: string;
   radius: number;
   health: number;
   maxHealth: number;
@@ -381,6 +382,9 @@ export class PixiGame {
     for (const animalId of Object.keys(ANIMALS)) {
       keysToLoad.push(animalSkinKey(animalId));
     }
+    for (const animalId of Object.keys(ANIMAL_VARIANTS)) {
+      keysToLoad.push(animalSkinKey(animalId));
+    }
 
     for (const foodId of Object.keys(FOODS)) {
       keysToLoad.push(foodImageKey(foodId));
@@ -522,8 +526,10 @@ export class PixiGame {
     }
     if (msg.abilityEvents && msg.abilityEvents.length > 0) {
       for (const ability of msg.abilityEvents) {
-        if (ability.abilityId === 'dash') {
+        if (this.isDashAbility(ability.abilityId)) {
           this.spawnDashEffect(ability.x, ability.y, ability.angle);
+        } else {
+          this.spawnAbilityPulseEffect(ability.x, ability.y, ability.abilityId);
         }
       }
     }
@@ -582,9 +588,11 @@ export class PixiGame {
       state.health = p.health;
       state.maxHealth = p.maxHealth;
 
-      // If the animal changed, update the sprite texture
-      if (state.animalId !== p.animalId) {
-        this.updatePlayerAnimalSprite(state, p.animalId, p.radius);
+      const skinId = p.skinId ?? p.animalId;
+
+      // If the animal or cosmetic skin changed, update the sprite texture
+      if (state.animalId !== p.animalId || state.skinId !== skinId) {
+        this.updatePlayerAnimalSprite(state, p.animalId, skinId, p.radius);
       }
 
       // Update radius if changed
@@ -616,7 +624,8 @@ export class PixiGame {
     playerContainer.label = `player-${p.id}`;
 
     // Animal sprite
-    const key = animalSkinKey(p.animalId);
+    const skinId = p.skinId ?? p.animalId;
+    const key = animalSkinKey(skinId);
     const texture = Assets.get<Texture>(key);
 
     let sprite: Sprite;
@@ -674,6 +683,7 @@ export class PixiGame {
       targetY: p.y,
       targetAngle: p.angle,
       animalId: p.animalId,
+      skinId,
       radius: p.radius,
       health: p.health,
       maxHealth: p.maxHealth,
@@ -681,13 +691,18 @@ export class PixiGame {
     };
   }
 
-  private updatePlayerAnimalSprite(state: PlayerRenderState, newAnimalId: string, newRadius: number): void {
+  private updatePlayerAnimalSprite(
+    state: PlayerRenderState,
+    newAnimalId: string,
+    newSkinId: string,
+    newRadius: number,
+  ): void {
     // Remove old sprite
     state.container.removeChild(state.sprite);
     state.sprite.destroy();
 
     // Create new sprite
-    const key = animalSkinKey(newAnimalId);
+    const key = animalSkinKey(newSkinId);
     const texture = Assets.get<Texture>(key);
 
     let newSprite: Sprite;
@@ -711,6 +726,7 @@ export class PixiGame {
 
     state.sprite = newSprite;
     state.animalId = newAnimalId;
+    state.skinId = newSkinId;
     state.radius = newRadius;
 
     // Update name label position
@@ -922,6 +938,30 @@ export class PixiGame {
     this.timedGraphicEffects.push({ graphic, ttl: 0.35, maxTtl: 0.35 });
   }
 
+  private spawnAbilityPulseEffect(worldX: number, worldY: number, abilityId: string): void {
+    const graphic = new Graphics();
+    const color = this.abilityColor(abilityId);
+    graphic.position.set(worldX, worldY);
+    graphic.circle(0, 0, 70);
+    graphic.stroke({ width: 8, color, alpha: 0.72 });
+    this.layerEffects.addChild(graphic);
+
+    this.timedGraphicEffects.push({ graphic, ttl: 0.45, maxTtl: 0.45 });
+  }
+
+  private isDashAbility(abilityId: string): boolean {
+    return abilityId === 'dash' || abilityId.includes('dash') || abilityId === 'charge';
+  }
+
+  private abilityColor(abilityId: string): number {
+    if (abilityId.includes('fire')) return 0xf97316;
+    if (abilityId.includes('freeze') || abilityId.includes('snow')) return 0x93c5fd;
+    if (abilityId.includes('ink') || abilityId.includes('whirlpool')) return 0x312e81;
+    if (abilityId.includes('shock')) return 0xfacc15;
+    if (abilityId.includes('guard')) return 0x22c55e;
+    return 0xef4444;
+  }
+
   private updateTimedGraphicEffects(dt: number): void {
     for (let i = this.timedGraphicEffects.length - 1; i >= 0; i--) {
       const effect = this.timedGraphicEffects[i];
@@ -1051,7 +1091,7 @@ export class PixiGame {
 
       // Apply to container
       state.container.position.set(state.displayX, state.displayY);
-      state.sprite.rotation = state.displayAngle + Math.PI / 2;
+      state.sprite.rotation = state.displayAngle - Math.PI / 2;
     }
   }
 

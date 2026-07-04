@@ -2,8 +2,10 @@ package com.mimope.server.game.data;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -13,24 +15,43 @@ import static org.junit.jupiter.api.Assertions.*;
 class AnimalDefinitionTest {
 
     @Test
-    void registryContainsAllFirstPlayableAnimals() {
+    void registryContainsFullGameplayAnimalSet() {
         Map<String, AnimalDefinition> all = AnimalDefinition.all();
-        assertEquals(6, all.size());
+
+        assertEquals(46, all.size());
         assertNotNull(all.get("mouse"));
-        assertNotNull(all.get("rabbit"));
-        assertNotNull(all.get("pig"));
-        assertNotNull(all.get("fox"));
-        assertNotNull(all.get("deer"));
-        assertNotNull(all.get("lion"));
+        assertNotNull(all.get("shrimp"));
+        assertNotNull(all.get("chipmunk"));
+        assertNotNull(all.get("dragon"));
+        assertNotNull(all.get("kraken"));
+        assertNotNull(all.get("yeti"));
+        assertNotNull(all.get("blackdragon"));
     }
 
     @Test
-    void starterAnimalIsMouse() {
+    void normalEvolutionRegistryExcludesFinalUnlockOnlyAnimal() {
+        List<AnimalDefinition> normalAnimals = AnimalDefinition.all().values().stream()
+                .filter(AnimalDefinition::normalEvolution)
+                .toList();
+
+        assertEquals(45, normalAnimals.size());
+        assertFalse(AnimalDefinition.byId("blackdragon").normalEvolution());
+    }
+
+    @Test
+    void starterAnimalIsMouseAndStarterIdsAreValidated() {
         AnimalDefinition starter = AnimalDefinition.starter();
+
         assertNotNull(starter);
         assertEquals("mouse", starter.id());
         assertEquals(1, starter.tier());
         assertEquals(0, starter.xpRequired());
+        assertTrue(AnimalDefinition.isValidStarter(null));
+        assertTrue(AnimalDefinition.isValidStarter("mouse"));
+        assertTrue(AnimalDefinition.isValidStarter("shrimp"));
+        assertTrue(AnimalDefinition.isValidStarter("chipmunk"));
+        assertFalse(AnimalDefinition.isValidStarter("lemming"));
+        assertFalse(AnimalDefinition.isValidStarter("dragon"));
     }
 
     @Test
@@ -38,7 +59,8 @@ class AnimalDefinitionTest {
         AnimalDefinition fox = AnimalDefinition.byId("fox");
         assertNotNull(fox);
         assertEquals("Fox", fox.name());
-        assertEquals(4, fox.tier());
+        assertEquals(6, fox.tier());
+        assertEquals("dash", fox.abilityId());
     }
 
     @Test
@@ -47,78 +69,93 @@ class AnimalDefinitionTest {
     }
 
     @Test
-    void tiersAreSequential() {
-        List<Integer> tiers = AnimalDefinition.all().values().stream()
+    void registryCoversExpectedTierCurve() {
+        Set<Integer> tiers = AnimalDefinition.all().values().stream()
                 .map(AnimalDefinition::tier)
-                .sorted()
-                .toList();
-        assertEquals(List.of(1, 2, 3, 4, 5, 6), tiers);
+                .collect(Collectors.toSet());
+
+        assertEquals(Set.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17), tiers);
     }
 
     @Test
-    void xpRequiredIncreasesWithTier() {
+    void xpRequiredIsConsistentWithinTierAndNonDecreasingAcrossTiers() {
+        int previousTier = 0;
         int previousXp = -1;
         for (AnimalDefinition animal : AnimalDefinition.all().values()) {
-            assertTrue(animal.xpRequired() > previousXp,
-                    animal.id() + " xpRequired should be greater than previous tier");
-            previousXp = animal.xpRequired();
+            if (animal.tier() != previousTier) {
+                assertTrue(animal.xpRequired() > previousXp,
+                        animal.id() + " xpRequired should increase at each new tier");
+                previousTier = animal.tier();
+                previousXp = animal.xpRequired();
+            } else {
+                assertEquals(previousXp, animal.xpRequired(),
+                        animal.id() + " xpRequired should match its tier");
+            }
         }
     }
 
     @Test
-    void canEatReturnsTrueForValidPrey() {
+    void tierPredationAllowsHigherTierWithinSixTierWindow() {
         AnimalDefinition lion = AnimalDefinition.byId("lion");
-        assertNotNull(lion);
+
         assertTrue(lion.canEat("deer"));
-        assertTrue(lion.canEat("mouse"));
+        assertTrue(lion.canEat("fox"));
+        assertFalse(lion.canEat("pig"));
+        assertFalse(lion.canEat("croc"));
+        assertFalse(AnimalDefinition.byId("mouse").canEat("rabbit"));
     }
 
     @Test
-    void canEatReturnsFalseForInvalidPrey() {
-        AnimalDefinition mouse = AnimalDefinition.byId("mouse");
-        assertNotNull(mouse);
-        assertFalse(mouse.canEat("lion"));
-        assertFalse(mouse.canEat("rabbit"));
+    void evolutionOptionsReturnAllAnimalsAtNextAvailableTier() {
+        List<String> mouseOptions = AnimalDefinition.byId("mouse").evolutionOptions().stream()
+                .map(AnimalDefinition::id)
+                .toList();
+        List<String> hippoOptions = AnimalDefinition.byId("hippo").evolutionOptions().stream()
+                .map(AnimalDefinition::id)
+                .toList();
+        List<String> mammothOptions = AnimalDefinition.byId("mammoth").evolutionOptions().stream()
+                .map(AnimalDefinition::id)
+                .toList();
+
+        assertEquals(List.of("rabbit", "arctichare", "trout"), mouseOptions);
+        assertEquals(List.of("mammoth"), hippoOptions);
+        assertEquals(List.of("dragon", "kraken", "yeti"), mammothOptions);
     }
 
     @Test
-    void mouseCannotEatAnything() {
-        AnimalDefinition mouse = AnimalDefinition.byId("mouse");
-        assertNotNull(mouse);
-        assertTrue(mouse.canEat().isEmpty());
+    void blackdragonIsFinalUnlockOnly() {
+        AnimalDefinition dragon = AnimalDefinition.byId("dragon");
+        AnimalDefinition blackdragon = AnimalDefinition.byId("blackdragon");
+
+        assertTrue(dragon.evolutionOptions().isEmpty());
+        assertFalse(dragon.canUnlockFinal(2_999_999));
+        assertTrue(dragon.canUnlockFinal(3_000_000));
+        assertFalse(blackdragon.normalEvolution());
     }
 
     @Test
-    void evolutionOptionsReturnsNextTier() {
-        AnimalDefinition pig = AnimalDefinition.byId("pig");
-        assertNotNull(pig);
-        List<AnimalDefinition> options = pig.evolutionOptions();
-        assertEquals(1, options.size());
-        assertEquals("fox", options.get(0).id());
-    }
+    void allAnimalsHavePositiveStatsAndKnownAbility() {
+        Set<String> abilityIds = Set.of(
+                "dash", "burrow_dash", "dig_dash", "shell_guard", "ice_slide", "stink_dash",
+                "forage_dash", "ink_dash", "sting_pulse", "back_kick", "charge", "shock_pulse",
+                "claw", "inflate_guard", "roar_pulse", "croc_bite", "wave_pulse",
+                "snowball_dash", "fire_dash", "whirlpool_pulse", "freeze_pulse"
+        );
 
-    @Test
-    void lionHasNoEvolutionOptions() {
-        AnimalDefinition lion = AnimalDefinition.byId("lion");
-        assertNotNull(lion);
-        assertTrue(lion.evolutionOptions().isEmpty());
-    }
-
-    @Test
-    void allAnimalsHaveLandBiome() {
-        for (AnimalDefinition animal : AnimalDefinition.all().values()) {
-            assertEquals(Biome.LAND, animal.biome(),
-                    animal.id() + " should be in LAND biome for Phase 2");
-        }
-    }
-
-    @Test
-    void allAnimalsHavePositiveStats() {
         for (AnimalDefinition animal : AnimalDefinition.all().values()) {
             assertTrue(animal.speed() > 0, animal.id() + " speed should be positive");
             assertTrue(animal.radius() > 0, animal.id() + " radius should be positive");
             assertTrue(animal.maxHealth() > 0, animal.id() + " maxHealth should be positive");
+            assertTrue(abilityIds.contains(animal.abilityId()), animal.id() + " has unknown ability");
         }
+    }
+
+    @Test
+    void registryIncludesAllGameplayBiomes() {
+        assertEquals(Biome.LAND, AnimalDefinition.byId("mouse").biome());
+        assertEquals(Biome.OCEAN, AnimalDefinition.byId("shrimp").biome());
+        assertEquals(Biome.ARCTIC, AnimalDefinition.byId("chipmunk").biome());
+        assertEquals(Biome.FINAL, AnimalDefinition.byId("blackdragon").biome());
     }
 
     @Test

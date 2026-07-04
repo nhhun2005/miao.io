@@ -3,7 +3,7 @@ import { useUIStore } from '../../state/uiStore';
 import { useInputStore } from '../../state/inputStore';
 import { useGameStore } from '../../state/gameStore';
 import { GameCanvas } from '../../game/GameCanvas';
-import { ANIMALS } from '../../game/data/animals';
+import { ANIMALS, getEvolutionOptions } from '../../game/data/animals';
 import { Button, Modal } from '../../ui';
 import type { GameConnection } from '../../network/GameConnection';
 
@@ -61,9 +61,7 @@ export function GameScreen() {
   const angleDeg = ((angle * 180) / Math.PI).toFixed(0);
   const localPlayer = localPlayerId ? players[localPlayerId] : null;
   const currentAnimal = localPlayer ? ANIMALS[localPlayer.animalId] : null;
-  const nextEvolution = currentAnimal
-    ? Object.values(ANIMALS).find((animal) => animal.tier === currentAnimal.tier + 1)
-    : null;
+  const nextEvolution = currentAnimal ? getEvolutionOptions(currentAnimal.id)[0] : null;
   const xpForCurrentTier = currentAnimal?.xpRequired ?? 0;
   const xpForNextTier = nextEvolution?.xpRequired ?? xpForCurrentTier;
   const xpProgress = nextEvolution && localPlayer
@@ -114,7 +112,7 @@ export function GameScreen() {
             <strong>{Math.floor(localPlayer?.xp ?? 0)}</strong>
           </div>
           <div className="game-hud__ability">
-            <span>Dash</span>
+            <span>{currentAnimal?.abilityName ?? 'Ability'}</span>
             <strong>{abilityReady ? 'Ready' : `${localPlayer?.abilityCooldownTicks ?? 0}t`}</strong>
           </div>
         </div>
@@ -165,6 +163,21 @@ export function GameScreen() {
               />
               Sound
             </label>
+            <div className="settings-panel__section">
+              <div className="settings-panel__title">Controls</div>
+              <div className="settings-panel__row">
+                <span>Move</span>
+                <strong>Mouse pointer</strong>
+              </div>
+              <div className="settings-panel__row">
+                <span>Boost</span>
+                <strong>Left click / Space</strong>
+              </div>
+              <div className="settings-panel__row">
+                <span>Dash</span>
+                <strong>Right click / W / Enter</strong>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -172,7 +185,6 @@ export function GameScreen() {
       <div className="game-overlay game-overlay--debug">
         <details className="game-debug-panel">
           <summary className="game-debug-panel__title">Input Debug</summary>
-          <div className="game-debug-panel__title">Input Debug</div>
           <div className="game-debug-panel__row">
             <span>Angle:</span>
             <span>{angleDeg}°</span>

@@ -5,7 +5,7 @@
  * Paths are relative to the /assets/ directory (served as static files).
  */
 
-import { ANIMALS, type AnimalDefinition } from './animals';
+import { AI_ANIMALS, ANIMALS, ANIMAL_VARIANTS, type AnimalDefinition } from './animals';
 import { FOODS, type FoodDefinition } from './foods';
 
 // ---------------------------------------------------------------------------
@@ -92,9 +92,23 @@ export function buildAssetManifest(basePath: string = '/'): AssetEntry[] {
   // Animal skins
   for (const animal of Object.values(ANIMALS) as AnimalDefinition[]) {
     entries.push({ key: animalSkinKey(animal.id), path: normalize(animal.skinPath) });
+    if (animal.winterSkinPath) {
+      entries.push({ key: `${animalSkinKey(animal.id)}_winter`, path: normalize(animal.winterSkinPath) });
+    }
     if (animal.fullSizePath) {
       entries.push({ key: animalFullSizeKey(animal.id), path: normalize(animal.fullSizePath) });
     }
+  }
+
+  for (const variant of Object.values(ANIMAL_VARIANTS)) {
+    entries.push({ key: animalSkinKey(variant.id), path: normalize(variant.skinPath) });
+    if (variant.winterSkinPath) {
+      entries.push({ key: `${animalSkinKey(variant.id)}_winter`, path: normalize(variant.winterSkinPath) });
+    }
+  }
+
+  for (const aiAnimal of Object.values(AI_ANIMALS)) {
+    entries.push({ key: animalSkinKey(aiAnimal.id), path: normalize(aiAnimal.skinPath) });
   }
 
   // Food images

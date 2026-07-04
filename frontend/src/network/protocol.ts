@@ -48,6 +48,7 @@ export type ServerMessageTypeValue =
 export interface JoinMessage {
   type: typeof ClientMessageType.JOIN;
   nickname: string;
+  starterAnimalId?: string;
 }
 
 /** Sent at a throttled rate with the player's current input state. */
@@ -107,6 +108,7 @@ export interface SnapshotPlayerData {
   radius: number;
   angle: number;
   animalId: string;
+  skinId?: string;
   health: number;
   maxHealth: number;
   xp: number;
@@ -226,8 +228,8 @@ export type ServerMessage =
 // Message builders (client → server)
 // ---------------------------------------------------------------------------
 
-export function createJoinMessage(nickname: string): JoinMessage {
-  return { type: ClientMessageType.JOIN, nickname };
+export function createJoinMessage(nickname: string, starterAnimalId?: string): JoinMessage {
+  return { type: ClientMessageType.JOIN, nickname, starterAnimalId };
 }
 
 export function createInputMessage(

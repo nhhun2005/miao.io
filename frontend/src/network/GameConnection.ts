@@ -118,9 +118,9 @@ export class GameConnection {
   }
 
   /** Send join message with nickname. */
-  join(nickname: string): void {
+  join(nickname: string, starterAnimalId?: string): void {
     this.lastNickname = nickname;
-    this.send(createJoinMessage(nickname));
+    this.send(createJoinMessage(nickname, starterAnimalId));
   }
 
   /** Send an input message. */

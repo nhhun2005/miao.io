@@ -10,6 +10,7 @@ export interface PlayerSnapshot {
   radius: number;
   angle: number;
   animalId: string;
+  skinId?: string;
   health: number;
   maxHealth: number;
   xp: number;

@@ -5,3 +5,4 @@
 export * from './animals';
 export * from './foods';
 export * from './assets';
+export * from './unusedMopeSkins';

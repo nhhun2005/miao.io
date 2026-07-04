@@ -14,6 +14,7 @@ class BiomeTest {
         assertEquals("land", Biome.LAND.toProtocol());
         assertEquals("ocean", Biome.OCEAN.toProtocol());
         assertEquals("arctic", Biome.ARCTIC.toProtocol());
+        assertEquals("final", Biome.FINAL.toProtocol());
     }
 
     @Test
@@ -21,6 +22,7 @@ class BiomeTest {
         assertEquals(Biome.LAND, Biome.fromProtocol("land"));
         assertEquals(Biome.OCEAN, Biome.fromProtocol("OCEAN"));
         assertEquals(Biome.ARCTIC, Biome.fromProtocol("Arctic"));
+        assertEquals(Biome.FINAL, Biome.fromProtocol("Final"));
     }
 
     @Test

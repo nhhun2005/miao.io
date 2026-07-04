@@ -169,6 +169,49 @@ input {
   font-size: 0.8rem;
 }
 
+.home-panel__starter-group {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+}
+
+.home-panel__starter {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  display: grid;
+  gap: 0.2rem;
+  justify-items: center;
+  min-height: 5.7rem;
+  padding: 0.45rem;
+}
+
+.home-panel__starter--active {
+  border-color: rgba(132, 204, 22, 0.85);
+  box-shadow: 0 0 0 2px rgba(132, 204, 22, 0.22);
+}
+
+.home-panel__starter img {
+  height: 2.25rem;
+  object-fit: contain;
+  width: 2.25rem;
+}
+
+.home-panel__starter span {
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.home-panel__starter small {
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  text-transform: capitalize;
+}
+
 /* --- Loading Panel ----------------------------------------- */
 .loading-panel {
   gap: 1.5rem;
@@ -489,7 +532,10 @@ input {
 }
 
 .settings-panel {
+  display: grid;
+  gap: 0.75rem;
   margin-top: 0.5rem;
+  min-width: 15rem;
   padding: 0.6rem;
 }
 
@@ -498,6 +544,35 @@ input {
   display: flex;
   gap: 0.5rem;
   font-size: 0.85rem;
+}
+
+.settings-panel__section {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  display: grid;
+  gap: 0.4rem;
+  padding-top: 0.65rem;
+}
+
+.settings-panel__title {
+  color: var(--color-accent);
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.settings-panel__row {
+  align-items: center;
+  color: var(--color-text-muted);
+  display: flex;
+  font-size: 0.78rem;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.settings-panel__row strong {
+  color: var(--color-text);
+  font-size: 0.78rem;
+  text-align: right;
 }
 
 /* --- Debug Panel (Phase 5) --------------------------------- */

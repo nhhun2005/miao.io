@@ -48,6 +48,13 @@ describe('createJoinMessage', () => {
     expect(msg.type).toBe('join');
     expect(msg.nickname).toBe('Alice');
   });
+
+  it('creates a join message with optional starter animal', () => {
+    const msg = createJoinMessage('Alice', 'shrimp');
+    expect(msg.type).toBe('join');
+    expect(msg.nickname).toBe('Alice');
+    expect(msg.starterAnimalId).toBe('shrimp');
+  });
 });
 
 describe('createInputMessage', () => {
@@ -130,6 +137,7 @@ describe('parseServerMessage', () => {
           radius: 22,
           angle: 1.5,
           animalId: 'mouse',
+          skinId: 'mouse',
           health: 100,
           maxHealth: 100,
           xp: 0,
@@ -148,6 +156,7 @@ describe('parseServerMessage', () => {
       expect(msg.tick).toBe(100);
       expect(msg.players).toHaveLength(1);
       expect(msg.players[0].id).toBe('p1');
+      expect(msg.players[0].skinId).toBe('mouse');
       expect(msg.foods).toHaveLength(1);
       expect(msg.foods[0].foodId).toBe('berry');
       expect(msg.leaderboard).toHaveLength(1);

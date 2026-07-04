@@ -41,6 +41,7 @@ public record SnapshotMessage(
             double radius,
             double angle,
             String animalId,
+            String skinId,
             double health,
             double maxHealth,
             double xp,
@@ -55,6 +56,7 @@ public record SnapshotMessage(
             m.put("radius", radius);
             m.put("angle", angle);
             m.put("animalId", animalId);
+            m.put("skinId", skinId);
             m.put("health", health);
             m.put("maxHealth", maxHealth);
             m.put("xp", xp);

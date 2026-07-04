@@ -58,6 +58,12 @@ public record FoodDefinition(
         map.put("arctic_berry", new FoodDefinition(
                 "arctic_berry", "Arctic Berry", 12, 10, 1, Biome.ARCTIC, 35));
 
+        map.put("snail", new FoodDefinition(
+                "snail", "Snail", 25, 14, 1, Biome.LAND, 8));
+
+        map.put("snail2", new FoodDefinition(
+                "snail2", "Snail", 25, 14, 1, Biome.LAND, 0));
+
         REGISTRY = Collections.unmodifiableMap(map);
     }
 

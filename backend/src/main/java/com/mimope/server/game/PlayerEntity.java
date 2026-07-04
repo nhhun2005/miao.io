@@ -14,6 +14,7 @@ public class PlayerEntity {
     private final String id;
     private String nickname;
     private AnimalDefinition animal;
+    private String skinId;
 
     // Position & motion
     private double x;
@@ -36,11 +37,13 @@ public class PlayerEntity {
     // Ability: first MVP ability is a short dash.
     private static final long ABILITY_COOLDOWN_TICKS = 100;
     private long lastAbilityTick = -ABILITY_COOLDOWN_TICKS;
+    private long guardUntilTick = -1;
 
     public PlayerEntity(String id, String nickname, AnimalDefinition animal, double x, double y) {
         this.id = id;
         this.nickname = nickname;
         this.animal = animal;
+        this.skinId = animal.id();
         this.x = x;
         this.y = y;
         this.angle = 0;
@@ -116,6 +119,13 @@ public class PlayerEntity {
     }
 
     public void damage(double amount) {
+        damage(amount, -1);
+    }
+
+    public void damage(double amount, long currentTick) {
+        if (currentTick >= 0 && currentTick <= guardUntilTick) {
+            amount *= 0.5;
+        }
         this.health = Math.max(0, this.health - amount);
         if (this.health <= 0) {
             kill();
@@ -123,7 +133,12 @@ public class PlayerEntity {
     }
 
     public void setAnimal(AnimalDefinition animal) {
+        setAnimal(animal, animal.id());
+    }
+
+    public void setAnimal(AnimalDefinition animal, String skinId) {
         this.animal = animal;
+        this.skinId = skinId;
         this.health = animal.maxHealth();
         this.evolutionOptionsSent = false;
     }
@@ -131,6 +146,9 @@ public class PlayerEntity {
     public boolean canEvolveTo(AnimalDefinition target) {
         if (target == null) {
             return false;
+        }
+        if ("blackdragon".equals(target.id())) {
+            return animal.canUnlockFinal(xp);
         }
         return animal.evolutionOptions().stream().anyMatch(option -> option.id().equals(target.id()))
                 && xp >= target.xpRequired();
@@ -145,9 +163,14 @@ public class PlayerEntity {
     }
 
     public java.util.List<AnimalDefinition> getAvailableEvolutionOptions() {
-        return animal.evolutionOptions().stream()
+        java.util.List<AnimalDefinition> options = new java.util.ArrayList<>(animal.evolutionOptions().stream()
                 .filter(option -> xp >= option.xpRequired())
-                .toList();
+                .toList());
+        AnimalDefinition blackDragon = AnimalDefinition.byId("blackdragon");
+        if (blackDragon != null && animal.canUnlockFinal(xp)) {
+            options.add(blackDragon);
+        }
+        return options;
     }
 
     public void kill() {
@@ -161,6 +184,10 @@ public class PlayerEntity {
 
     public void markAbilityUsed(long currentTick) {
         this.lastAbilityTick = currentTick;
+    }
+
+    public void guardForTicks(long currentTick, long durationTicks) {
+        this.guardUntilTick = Math.max(this.guardUntilTick, currentTick + durationTicks);
     }
 
     public long getAbilityCooldownRemainingTicks(long currentTick) {
@@ -183,6 +210,10 @@ public class PlayerEntity {
 
     public AnimalDefinition getAnimal() {
         return animal;
+    }
+
+    public String getSkinId() {
+        return skinId;
     }
 
     public double getX() {

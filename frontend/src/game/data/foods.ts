@@ -106,6 +106,28 @@ export const FOODS: Record<string, FoodDefinition> = {
     imagePath: 'img/arcticBerry.png',
     edibleImagePath: 'img/arcticBerry_e.png',
   },
+  snail: {
+    id: 'snail',
+    name: 'Snail',
+    xp: 25,
+    radius: 14,
+    minTier: 1,
+    biome: 'land',
+    spawnWeight: 8,
+    imagePath: 'skins/snail.png',
+    edibleImagePath: 'skins/snail.png',
+  },
+  snail2: {
+    id: 'snail2',
+    name: 'Snail',
+    xp: 25,
+    radius: 14,
+    minTier: 1,
+    biome: 'land',
+    spawnWeight: 0,
+    imagePath: 'skins/snail2.png',
+    edibleImagePath: 'skins/snail2.png',
+  },
 };
 
 /** All food IDs as an array. */
