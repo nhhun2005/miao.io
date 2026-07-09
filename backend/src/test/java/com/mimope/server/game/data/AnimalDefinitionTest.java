@@ -78,6 +78,36 @@ class AnimalDefinitionTest {
     }
 
     @Test
+    void maxHealthIsCentralizedByTier() {
+        Map<Integer, Integer> expected = Map.ofEntries(
+                Map.entry(1, 2),
+                Map.entry(2, 3),
+                Map.entry(3, 4),
+                Map.entry(4, 5),
+                Map.entry(5, 6),
+                Map.entry(6, 7),
+                Map.entry(7, 8),
+                Map.entry(8, 9),
+                Map.entry(9, 10),
+                Map.entry(10, 11),
+                Map.entry(11, 12),
+                Map.entry(12, 13),
+                Map.entry(13, 14),
+                Map.entry(14, 16),
+                Map.entry(15, 20)
+        );
+
+        for (Map.Entry<Integer, Integer> entry : expected.entrySet()) {
+            assertEquals(entry.getValue(), AnimalDefinition.maxHealthForTier(entry.getKey()));
+        }
+
+        for (AnimalDefinition animal : AnimalDefinition.all().values()) {
+            assertEquals(AnimalDefinition.maxHealthForTier(animal.tier()), animal.maxHealth(),
+                    animal.id() + " maxHealth should come from tier table");
+        }
+    }
+
+    @Test
     void xpRequiredIsConsistentWithinTierAndNonDecreasingAcrossTiers() {
         int previousTier = 0;
         int previousXp = -1;

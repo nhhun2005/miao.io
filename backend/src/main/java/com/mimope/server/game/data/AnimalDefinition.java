@@ -112,7 +112,7 @@ public record AnimalDefinition(
                             String abilityId,
                             boolean normalEvolution) {
         map.put(id, new AnimalDefinition(
-                id, name, tier, speed, radius, maxHealth, xpRequired, biome, abilityId, normalEvolution));
+                id, name, tier, speed, radius, maxHealthForTier(tier), xpRequired, biome, abilityId, normalEvolution));
     }
 
     public static Map<String, AnimalDefinition> all() {
@@ -125,6 +125,27 @@ public record AnimalDefinition(
 
     public static AnimalDefinition starter() {
         return REGISTRY.get("mouse");
+    }
+
+    public static int maxHealthForTier(int tier) {
+        return switch (tier) {
+            case 1 -> 2;
+            case 2 -> 3;
+            case 3 -> 4;
+            case 4 -> 5;
+            case 5 -> 6;
+            case 6 -> 7;
+            case 7 -> 8;
+            case 8 -> 9;
+            case 9 -> 10;
+            case 10 -> 11;
+            case 11 -> 12;
+            case 12 -> 13;
+            case 13 -> 14;
+            case 14 -> 16;
+            case 15 -> 20;
+            default -> 2;
+        };
     }
 
     public static boolean isValidStarter(String id) {

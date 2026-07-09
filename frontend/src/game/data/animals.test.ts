@@ -10,6 +10,7 @@ import {
   STARTER_ANIMAL_IDS,
   getAnimalPreviewPath,
   getEvolutionOptions,
+  maxHealthForTier,
 } from './animals';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
@@ -68,6 +69,22 @@ describe('animal gameplay registry', () => {
     expect(new Set(Object.values(ANIMALS).map((animal) => animal.tier))).toEqual(
       new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]),
     );
+  });
+
+  it('uses tier-based max health for every playable animal', () => {
+    const expectedHealthByTier = new Map([
+      [1, 2], [2, 3], [3, 4], [4, 5], [5, 6],
+      [6, 7], [7, 8], [8, 9], [9, 10], [10, 11],
+      [11, 12], [12, 13], [13, 14], [14, 16], [15, 20],
+    ]);
+
+    for (const [tier, maxHealth] of expectedHealthByTier) {
+      expect(maxHealthForTier(tier)).toBe(maxHealth);
+    }
+
+    for (const animal of Object.values(ANIMALS)) {
+      expect(animal.maxHealth, `${animal.id} maxHealth`).toBe(maxHealthForTier(animal.tier));
+    }
   });
 
   it('points every gameplay, variant, and AI skin path at an existing file', () => {

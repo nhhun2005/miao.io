@@ -366,6 +366,7 @@ class GameWorldTest {
         assertTrue(evolved.success());
         assertEquals("rabbit", player.getAnimal().id());
         assertEquals(AnimalDefinition.byId("rabbit").maxHealth(), player.getHealth());
+        assertEquals(3, player.getHealth());
     }
 
     @Test
@@ -388,6 +389,34 @@ class GameWorldTest {
         assertTrue(arcticEvolution.success());
         assertEquals("penguin", player.getAnimal().id());
         assertEquals(Biome.ARCTIC, world.biomeAt(player.getX(), player.getY()));
+    }
+
+    @Test
+    void evolvePlayerFullyHealsToNewTierHealth() {
+        PlayerEntity player = world.spawnPlayer("p1", "Alice");
+        player.setAnimal(AnimalDefinition.byId("fox"));
+        for (int i = 0; i < 5; i++) {
+            player.damageByBite();
+        }
+        assertEquals(2, player.getHealth());
+        player.addXp(4_000);
+
+        GameWorld.EvolutionResult zebraEvolution = world.evolvePlayer(player.getId(), "zebra");
+
+        assertTrue(zebraEvolution.success());
+        assertEquals("zebra", player.getAnimal().id());
+        assertEquals(8, player.getHealth());
+        assertEquals(8, player.getMaxHealth());
+
+        player.setAnimal(AnimalDefinition.byId("hippo"));
+        player.addXp(500_000);
+
+        GameWorld.EvolutionResult dragonEvolution = world.evolvePlayer(player.getId(), "dragon");
+
+        assertTrue(dragonEvolution.success());
+        assertEquals("dragon", player.getAnimal().id());
+        assertEquals(16, player.getHealth());
+        assertEquals(16, player.getMaxHealth());
     }
 
     @Test
@@ -426,6 +455,8 @@ class GameWorldTest {
 
         assertTrue(result.success());
         assertEquals("blackdragon", player.getAnimal().id());
+        assertEquals(20, player.getHealth());
+        assertEquals(20, player.getMaxHealth());
     }
 
     @Test
@@ -543,7 +574,7 @@ class GameWorldTest {
     // ------------------------------------------------------------------ predation and abilities
 
     @Test
-    void predatorCollisionKillsPreyAndAwardsXp() {
+    void predatorCollisionBitesPreyForOneHp() {
         PlayerEntity predator = world.spawnPlayer("p1", "Hunter");
         PlayerEntity prey = world.spawnPlayer("p2", "Snack");
         predator.setAnimal(AnimalDefinition.byId("fox"));
@@ -552,24 +583,215 @@ class GameWorldTest {
 
         world.tick(0.05);
 
-        assertFalse(prey.isAlive());
-        assertTrue(predator.getXp() >= 50);
-        assertEquals(1, world.getDeathEvents().size());
-        assertEquals(prey.getId(), world.getDeathEvents().get(0).victimId());
+        assertTrue(prey.isAlive());
+        assertEquals(1, prey.getHealth());
+        assertEquals(0, predator.getXp());
+        assertTrue(world.getDeathEvents().isEmpty());
     }
 
     @Test
-    void sameTierCollisionDoesNotKill() {
+    void nonLethalBiteStealsTenPercentOfCurrentXp() {
+        PlayerEntity attacker = world.spawnPlayer("p1", "Attacker");
+        PlayerEntity target = world.spawnPlayer("p2", "Target");
+        target.setAnimal(AnimalDefinition.byId("pig"));
+        target.setXp(10_000);
+        setPlayerPosition(attacker, 500, 500);
+        setPlayerPosition(target, 510, 500);
+        attacker.setAngle(0);
+
+        world.tick(0.05);
+
+        assertEquals(4, target.getHealth());
+        assertEquals(1_000, attacker.getXp());
+        assertEquals(9_000, target.getXp());
+    }
+
+    @Test
+    void nonLethalBiteWithSmallXpStealsAtLeastOneXp() {
+        PlayerEntity attacker = world.spawnPlayer("p1", "Attacker");
+        PlayerEntity target = world.spawnPlayer("p2", "Target");
+        target.setAnimal(AnimalDefinition.byId("pig"));
+        target.setXp(5);
+        setPlayerPosition(attacker, 500, 500);
+        setPlayerPosition(target, 510, 500);
+        attacker.setAngle(0);
+
+        world.tick(0.05);
+
+        assertEquals(4, target.getHealth());
+        assertEquals(1, attacker.getXp());
+        assertEquals(4, target.getXp());
+    }
+
+    @Test
+    void lowerTierBitesHigherTierAndStealsTenPercentXpWithoutReflectedDamage() {
+        PlayerEntity attacker = world.spawnPlayer("p1", "Mouse");
+        PlayerEntity target = world.spawnPlayer("p2", "Dragon");
+        attacker.setAnimal(AnimalDefinition.byId("mouse"));
+        target.setAnimal(AnimalDefinition.byId("dragon"));
+        target.setXp(500_000);
+        setPlayerPosition(attacker, 500, 500);
+        setPlayerPosition(target, 510, 500);
+        attacker.setAngle(0);
+        target.setAngle(0);
+
+        world.tick(0.05);
+
+        assertTrue(attacker.isAlive());
+        assertTrue(target.isAlive());
+        assertEquals(2, attacker.getHealth());
+        assertEquals(15, target.getHealth());
+        assertEquals(50_000, attacker.getXp());
+        assertEquals(450_000, target.getXp());
+    }
+
+    @Test
+    void higherTierBitesLowerTierAndStealsXp() {
+        PlayerEntity attacker = world.spawnPlayer("p1", "Dragon");
+        PlayerEntity target = world.spawnPlayer("p2", "Mouse");
+        attacker.setAnimal(AnimalDefinition.byId("dragon"));
+        target.setAnimal(AnimalDefinition.byId("mouse"));
+        target.setXp(10);
+        setPlayerPosition(attacker, 500, 500);
+        setPlayerPosition(target, 510, 500);
+        attacker.setAngle(0);
+        target.setAngle(0);
+
+        world.tick(0.05);
+
+        assertEquals(16, attacker.getHealth());
+        assertEquals(1, target.getHealth());
+        assertEquals(1, attacker.getXp());
+        assertEquals(9, target.getXp());
+    }
+
+    @Test
+    void sameTierAnimalsCannotBiteEachOther() {
+        PlayerEntity attacker = world.spawnPlayer("p1", "Fox");
+        PlayerEntity target = world.spawnPlayer("p2", "Jelly");
+        attacker.setAnimal(AnimalDefinition.byId("fox"));
+        target.setAnimal(AnimalDefinition.byId("jellyfish"));
+        target.setXp(2_500);
+        setPlayerPosition(attacker, 500, 500);
+        setPlayerPosition(target, 510, 500);
+        attacker.setAngle(0);
+        target.setAngle(0);
+
+        world.tick(0.05);
+
+        assertEquals(7, attacker.getHealth());
+        assertEquals(7, target.getHealth());
+        assertEquals(0, attacker.getXp());
+        assertEquals(2_500, target.getXp());
+        assertTrue(world.getDeathEvents().isEmpty());
+    }
+
+    @Test
+    void biteCanDropTargetBelowCurrentTierXpUnlockWithoutDeEvolving() {
+        PlayerEntity attacker = world.spawnPlayer("p1", "Mouse");
+        PlayerEntity target = world.spawnPlayer("p2", "Shark");
+        target.setAnimal(AnimalDefinition.byId("shark"));
+        target.setXp(126_000);
+        setPlayerPosition(attacker, 500, 500);
+        setPlayerPosition(target, 510, 500);
+        attacker.setAngle(0);
+
+        world.tick(0.05);
+
+        assertEquals(12, target.getHealth());
+        assertEquals(12_600, attacker.getXp());
+        assertEquals(113_400, target.getXp());
+        assertEquals("shark", target.getAnimal().id());
+    }
+
+    @Test
+    void biteStillDamagesWhenTargetHasZeroXp() {
+        PlayerEntity attacker = world.spawnPlayer("p1", "Mouse");
+        PlayerEntity target = world.spawnPlayer("p2", "Shark");
+        target.setAnimal(AnimalDefinition.byId("shark"));
+        target.setXp(0);
+        setPlayerPosition(attacker, 500, 500);
+        setPlayerPosition(target, 510, 500);
+        attacker.setAngle(0);
+
+        world.tick(0.05);
+
+        assertEquals(12, target.getHealth());
+        assertEquals(0, attacker.getXp());
+        assertEquals(0, target.getXp());
+    }
+
+    @Test
+    void biteCooldownPreventsEveryTickDamage() {
+        PlayerEntity predator = world.spawnPlayer("p1", "Hunter");
+        PlayerEntity prey = world.spawnPlayer("p2", "Snack");
+        predator.setAnimal(AnimalDefinition.byId("fox"));
+        setPlayerPosition(predator, 500, 500);
+        setPlayerPosition(prey, 510, 500);
+
+        world.tick(0.05);
+        world.tick(0.05);
+        world.tick(0.05);
+
+        assertTrue(prey.isAlive());
+        assertEquals(1, prey.getHealth());
+        assertTrue(world.getDeathEvents().isEmpty());
+    }
+
+    @Test
+    void lethalBiteTransfersAllRemainingXp() {
+        PlayerEntity predator = world.spawnPlayer("p1", "Hunter");
+        PlayerEntity prey = world.spawnPlayer("p2", "Snack");
+        predator.setAnimal(AnimalDefinition.byId("fox"));
+        prey.setXp(9_000);
+        prey.damageByBite();
+        setPlayerPosition(predator, 500, 500);
+        setPlayerPosition(prey, 510, 500);
+
+        world.tick(0.05);
+
+        assertFalse(prey.isAlive());
+        assertEquals(0, prey.getHealth());
+        assertEquals(9_000, predator.getXp());
+        assertEquals(0, prey.getXp());
+        assertEquals(1, world.getDeathEvents().size());
+        assertEquals(prey.getId(), world.getDeathEvents().get(0).victimId());
+        assertEquals(9_000, world.getDeathEvents().get(0).xpAwarded());
+    }
+
+    @Test
+    void targetBehindAttackerDoesNotTakeBiteDamage() {
         PlayerEntity a = world.spawnPlayer("p1", "Alice");
         PlayerEntity b = world.spawnPlayer("p2", "Bob");
         setPlayerPosition(a, 500, 500);
-        setPlayerPosition(b, 510, 500);
+        setPlayerPosition(b, 490, 500);
+        a.setAngle(0);
+        b.setAngle(Math.PI);
 
         world.tick(0.05);
 
         assertTrue(a.isAlive());
         assertTrue(b.isAlive());
+        assertEquals(2, a.getHealth());
+        assertEquals(2, b.getHealth());
         assertTrue(world.getDeathEvents().isEmpty());
+    }
+
+    @Test
+    void directionalCooldownAllowsTargetToBiteBackIndependently() {
+        PlayerEntity a = world.spawnPlayer("p1", "Alice");
+        PlayerEntity b = world.spawnPlayer("p2", "Bob");
+        a.setAnimal(AnimalDefinition.byId("fox"));
+        b.setAnimal(AnimalDefinition.byId("pig"));
+        setPlayerPosition(a, 500, 500);
+        setPlayerPosition(b, 510, 500);
+        a.setAngle(0);
+        b.setAngle(Math.PI);
+
+        world.tick(0.05);
+
+        assertEquals(6, a.getHealth());
+        assertEquals(4, b.getHealth());
     }
 
     @Test

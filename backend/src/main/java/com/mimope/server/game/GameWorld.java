@@ -34,6 +34,7 @@ public class GameWorld {
     private final ConcurrentHashMap<String, PlayerEntity> players = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, FoodEntity> foods = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Long> playerSpawnMs = new ConcurrentHashMap<>();
+    private final Map<String, Long> lastBiteTickByPair = new HashMap<>();
     private final AtomicLong foodIdCounter = new AtomicLong(0);
 
     private final FoodSpawnService foodSpawnService;
@@ -67,6 +68,8 @@ public class GameWorld {
     /** Default visibility radius for snapshot filtering. */
     private static final double DEFAULT_VIEW_RADIUS = 2000.0;
     private static final double DASH_SPEED_MULTIPLIER = 3.0;
+    private static final long BITE_COOLDOWN_TICKS = 20;
+    private static final double BITE_ARC_RADIANS = Math.PI * 2.0 / 3.0;
 
     private long tick = 0;
 
@@ -313,49 +316,129 @@ public class GameWorld {
     private void checkPlayerPredation() {
         Set<String> killedThisTick = new HashSet<>();
 
-        for (PlayerEntity predator : players.values()) {
-            if (!predator.isAlive()) {
+        for (PlayerEntity attacker : players.values()) {
+            if (!attacker.isAlive()) {
                 continue;
             }
 
             List<PlayerEntity> nearbyPlayers = spatialGrid.queryPlayers(
-                    predator.getX(), predator.getY(), predator.getRadius() * 2.5);
+                    attacker.getX(), attacker.getY(), attacker.getRadius() * 2.5);
 
-            for (PlayerEntity prey : nearbyPlayers) {
-                if (predator == prey || !prey.isAlive() || killedThisTick.contains(prey.getId())) {
+            for (PlayerEntity target : nearbyPlayers) {
+                if (killedThisTick.contains(target.getId())) {
                     continue;
                 }
-                if (!predator.getAnimal().canEat(prey.getAnimal())) {
-                    continue;
+                BiteResult result = applyBite(attacker, target);
+                if (result.killed()) {
+                    killedThisTick.add(target.getId());
                 }
-
-                double dx = predator.getX() - prey.getX();
-                double dy = predator.getY() - prey.getY();
-                double touchDist = predator.getRadius() + prey.getRadius();
-                if (dx * dx + dy * dy > touchDist * touchDist) {
-                    continue;
-                }
-
-                double xpAwarded = Math.max(50.0, prey.getXp() * 0.25 + prey.getAnimal().tier() * 25.0);
-                prey.kill();
-                predator.addXp(xpAwarded);
-                killedThisTick.add(prey.getId());
-
-                long spawnedAt = playerSpawnMs.getOrDefault(prey.getId(), System.currentTimeMillis());
-                deathEvents.add(new DeathEvent(
-                        prey.getId(),
-                        predator.getId(),
-                        predator.getNickname(),
-                        DeathEvent.REASON_EATEN,
-                        prey.getX(),
-                        prey.getY(),
-                        xpAwarded,
-                        Math.max(0, System.currentTimeMillis() - spawnedAt)
-                ));
-
-                log.debug("{} ate {} (+{}xp)", predator.getNickname(), prey.getNickname(), xpAwarded);
             }
         }
+    }
+
+    private BiteResult applyBite(PlayerEntity attacker, PlayerEntity target) {
+        if (attacker == null || target == null || attacker == target) {
+            return BiteResult.noHit();
+        }
+        if (!attacker.isAlive() || !target.isAlive()) {
+            return BiteResult.noHit();
+        }
+        if (attacker.getAnimal().tier() == target.getAnimal().tier()) {
+            return BiteResult.noHit();
+        }
+        if (!isBiteCollision(attacker, target) || !isFacingTarget(attacker, target)) {
+            return BiteResult.noHit();
+        }
+        if (!canBiteNow(attacker.getId(), target.getId())) {
+            return BiteResult.noHit();
+        }
+
+        boolean lethal = target.getHealth() <= 1;
+        double stolenXp = transferXpOnBite(attacker, target, lethal);
+        target.damageByBite();
+        log.debug("{} bit {} (-1hp, stolenXp={}, health={}/{})",
+                attacker.getNickname(), target.getNickname(), stolenXp, target.getHealth(), target.getMaxHealth());
+
+        if (!target.isDeadByHealth()) {
+            return new BiteResult(false, stolenXp);
+        }
+
+        target.kill();
+        clearBiteCooldownsForPlayer(target.getId());
+        long spawnedAt = playerSpawnMs.getOrDefault(target.getId(), System.currentTimeMillis());
+        deathEvents.add(new DeathEvent(
+                target.getId(),
+                attacker.getId(),
+                attacker.getNickname(),
+                DeathEvent.REASON_EATEN,
+                target.getX(),
+                target.getY(),
+                stolenXp,
+                Math.max(0, System.currentTimeMillis() - spawnedAt)
+        ));
+
+        log.debug("{} bit {} to death (+{}xp stolen)", attacker.getNickname(), target.getNickname(), stolenXp);
+        return new BiteResult(true, stolenXp);
+    }
+
+    private double transferXpOnBite(PlayerEntity attacker, PlayerEntity target, boolean lethal) {
+        double stolenXp = lethal
+                ? Math.max(0, target.getXp())
+                : calculateTenPercentXpSteal(target);
+
+        if (stolenXp > 0) {
+            target.setXp(target.getXp() - stolenXp);
+            attacker.addXp(stolenXp);
+        }
+
+        return stolenXp;
+    }
+
+    private double calculateTenPercentXpSteal(PlayerEntity target) {
+        double targetXp = Math.max(0, target.getXp());
+        if (targetXp <= 0) {
+            return 0;
+        }
+        double stolenXp = Math.max(1, Math.floor(targetXp * 0.10));
+        return Math.min(stolenXp, targetXp);
+    }
+
+    private boolean isBiteCollision(PlayerEntity attacker, PlayerEntity target) {
+        double dx = attacker.getX() - target.getX();
+        double dy = attacker.getY() - target.getY();
+        double touchDist = attacker.getRadius() + target.getRadius();
+        return dx * dx + dy * dy <= touchDist * touchDist;
+    }
+
+    private boolean isFacingTarget(PlayerEntity attacker, PlayerEntity target) {
+        double dx = target.getX() - attacker.getX();
+        double dy = target.getY() - attacker.getY();
+        if (dx == 0 && dy == 0) {
+            return true;
+        }
+        double targetAngle = Math.atan2(dy, dx);
+        double diff = Math.abs(normalizeAngle(targetAngle - attacker.getAngle()));
+        return diff <= BITE_ARC_RADIANS / 2.0;
+    }
+
+    private boolean canBiteNow(String attackerId, String targetId) {
+        String key = biteKey(attackerId, targetId);
+        Long lastTick = lastBiteTickByPair.get(key);
+        if (lastTick == null || tick - lastTick >= BITE_COOLDOWN_TICKS) {
+            lastBiteTickByPair.put(key, tick);
+            return true;
+        }
+        return false;
+    }
+
+    private static String biteKey(String attackerId, String targetId) {
+        return attackerId + "->" + targetId;
+    }
+
+    private void clearBiteCooldownsForPlayer(String playerId) {
+        String outgoingPrefix = playerId + "->";
+        String incomingSuffix = "->" + playerId;
+        lastBiteTickByPair.keySet().removeIf(key -> key.startsWith(outgoingPrefix) || key.endsWith(incomingSuffix));
     }
 
     // ------------------------------------------------------------------ players
@@ -394,6 +477,7 @@ public class GameWorld {
     public PlayerEntity removePlayer(String playerId) {
         PlayerEntity removed = players.remove(playerId);
         playerSpawnMs.remove(playerId);
+        clearBiteCooldownsForPlayer(playerId);
         if (removed != null) {
             log.info("Player removed: {}", removed);
         }
@@ -495,6 +579,7 @@ public class GameWorld {
                 continue;
             }
             victim.kill();
+            clearBiteCooldownsForPlayer(playerId);
             long spawnedAt = playerSpawnMs.getOrDefault(playerId, System.currentTimeMillis());
             deathEvents.add(new DeathEvent(
                     playerId,
@@ -727,6 +812,12 @@ public class GameWorld {
             String playerId,
             List<EvolutionOptionsMessage.EvolutionOption> options
     ) {
+    }
+
+    private record BiteResult(boolean killed, double stolenXp) {
+        static BiteResult noHit() {
+            return new BiteResult(false, 0);
+        }
     }
 
     public record EvolutionResult(

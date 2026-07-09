@@ -14,7 +14,7 @@ class PlayerEntityTest {
 
     @BeforeEach
     void setUp() {
-        mouse = AnimalDefinition.starter(); // mouse: speed=200, radius=22, maxHealth=100
+        mouse = AnimalDefinition.starter(); // mouse: speed=200, radius=22, maxHealth=2
         player = new PlayerEntity("p1", "Alice", mouse, 500, 500);
     }
 
@@ -28,12 +28,19 @@ class PlayerEntityTest {
         assertEquals(500, player.getX());
         assertEquals(500, player.getY());
         assertEquals(0, player.getAngle());
-        assertEquals(100, player.getHealth());
-        assertEquals(100, player.getMaxHealth());
+        assertEquals(2, player.getHealth());
+        assertEquals(2, player.getMaxHealth());
         assertEquals(0, player.getXp());
         assertEquals(22, player.getRadius());
         assertEquals(200, player.getSpeed());
         assertTrue(player.isAlive());
+    }
+
+    @Test
+    void constructorSetsFullHealthFromAnimalTier() {
+        assertEquals(13, new PlayerEntity("p2", "Shark", AnimalDefinition.byId("shark"), 0, 0).getHealth());
+        assertEquals(16, new PlayerEntity("p3", "Dragon", AnimalDefinition.byId("dragon"), 0, 0).getHealth());
+        assertEquals(20, new PlayerEntity("p4", "BlackDragon", AnimalDefinition.byId("blackdragon"), 0, 0).getHealth());
     }
 
     // ------------------------------------------------------------------ input queue
@@ -157,6 +164,19 @@ class PlayerEntityTest {
         assertEquals(lion.maxHealth(), player.getHealth(), "Health should reset to new animal's max");
         assertEquals(lion.radius(), player.getRadius());
         assertEquals(lion.speed(), player.getSpeed());
+    }
+
+    @Test
+    void biteDamageSubtractsExactlyOneHp() {
+        player.damageByBite();
+
+        assertEquals(1, player.getHealth());
+        assertFalse(player.isDeadByHealth());
+
+        player.damageByBite();
+
+        assertEquals(0, player.getHealth());
+        assertTrue(player.isDeadByHealth());
     }
 
     @Test

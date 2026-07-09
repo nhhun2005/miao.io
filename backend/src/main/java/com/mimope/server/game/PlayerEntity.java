@@ -123,10 +123,18 @@ public class PlayerEntity {
         this.y = y;
     }
 
+    public void setAngle(double angle) {
+        this.angle = angle;
+    }
+
     // ------------------------------------------------------------------ state changes
 
     public void addXp(double amount) {
         this.xp += amount;
+    }
+
+    public void setXp(double xp) {
+        this.xp = Math.max(0, xp);
     }
 
     public void damage(double amount) {
@@ -141,6 +149,14 @@ public class PlayerEntity {
         if (this.health <= 0) {
             kill();
         }
+    }
+
+    public void damageByBite() {
+        this.health = Math.max(0, this.health - 1);
+    }
+
+    public boolean isDeadByHealth() {
+        return health <= 0;
     }
 
     public void setAnimal(AnimalDefinition animal) {
