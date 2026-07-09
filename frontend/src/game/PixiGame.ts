@@ -19,10 +19,11 @@ import {
   Ticker,
 } from 'pixi.js';
 
-import { ANIMALS, ANIMAL_VARIANTS } from './data/animals';
+import { ANIMALS } from './data/animals';
 import { FOODS } from './data/foods';
 import {
   buildAssetManifest,
+  buildGameplaySkinKeys,
   animalSkinKey,
   foodImageKey,
 } from './data/assets';
@@ -72,6 +73,7 @@ interface PlayerRenderState {
   sprite: Sprite;
   nameLabel: Text;
   healthBar: Graphics;
+  oceanSurvivalBar: Graphics;
   // Current displayed position (interpolated)
   displayX: number;
   displayY: number;
@@ -86,6 +88,8 @@ interface PlayerRenderState {
   radius: number;
   health: number;
   maxHealth: number;
+  oceanSurvival?: number;
+  maxOceanSurvival?: number;
   nickname: string;
 }
 
@@ -379,12 +383,7 @@ export class PixiGame {
     // Load all animal skins and food images
     const keysToLoad: string[] = [];
 
-    for (const animalId of Object.keys(ANIMALS)) {
-      keysToLoad.push(animalSkinKey(animalId));
-    }
-    for (const animalId of Object.keys(ANIMAL_VARIANTS)) {
-      keysToLoad.push(animalSkinKey(animalId));
-    }
+    keysToLoad.push(...buildGameplaySkinKeys());
 
     for (const foodId of Object.keys(FOODS)) {
       keysToLoad.push(foodImageKey(foodId));
@@ -587,6 +586,8 @@ export class PixiGame {
       state.targetAngle = p.angle;
       state.health = p.health;
       state.maxHealth = p.maxHealth;
+      state.oceanSurvival = p.oceanSurvival;
+      state.maxOceanSurvival = p.maxOceanSurvival;
 
       const skinId = p.skinId ?? p.animalId;
 
@@ -666,6 +667,9 @@ export class PixiGame {
     const healthBar = new Graphics();
     playerContainer.addChild(healthBar);
 
+    const oceanSurvivalBar = new Graphics();
+    playerContainer.addChild(oceanSurvivalBar);
+
     // Position at the snapshot position initially (no interp for first frame)
     playerContainer.position.set(p.x, p.y);
 
@@ -676,6 +680,7 @@ export class PixiGame {
       sprite,
       nameLabel,
       healthBar,
+      oceanSurvivalBar,
       displayX: p.x,
       displayY: p.y,
       displayAngle: p.angle,
@@ -687,6 +692,8 @@ export class PixiGame {
       radius: p.radius,
       health: p.health,
       maxHealth: p.maxHealth,
+      oceanSurvival: p.oceanSurvival,
+      maxOceanSurvival: p.maxOceanSurvival,
       nickname: p.nickname,
     };
   }
@@ -1103,6 +1110,7 @@ export class PixiGame {
     for (const [, state] of this.playerSprites) {
       const bar = state.healthBar;
       bar.clear();
+      state.oceanSurvivalBar.clear();
 
       const barWidth = state.radius * 2;
       const barHeight = 4;
@@ -1118,6 +1126,28 @@ export class PixiGame {
         const fillColor = healthPct > 0.5 ? 0x22c55e : healthPct > 0.25 ? 0xeab308 : 0xef4444;
         bar.rect(-barWidth / 2, barY, barWidth * healthPct, barHeight);
         bar.fill(fillColor);
+      }
+
+      const animal = ANIMALS[state.animalId];
+      const maxOceanSurvival = state.maxOceanSurvival ?? 0;
+      const shouldShowOceanSurvival =
+        animal?.biome === 'ocean' && maxOceanSurvival > 0;
+
+      if (shouldShowOceanSurvival) {
+        const survivalPct = Math.max(
+          0,
+          Math.min(1, (state.oceanSurvival ?? 0) / maxOceanSurvival),
+        );
+        const oceanBarY = barY + barHeight + 3;
+        const oceanBar = state.oceanSurvivalBar;
+
+        oceanBar.rect(-barWidth / 2, oceanBarY, barWidth, barHeight);
+        oceanBar.fill({ color: 0x111827, alpha: 0.55 });
+
+        if (survivalPct > 0) {
+          oceanBar.rect(-barWidth / 2, oceanBarY, barWidth * survivalPct, barHeight);
+          oceanBar.fill(0x87cefa);
+        }
       }
     }
   }

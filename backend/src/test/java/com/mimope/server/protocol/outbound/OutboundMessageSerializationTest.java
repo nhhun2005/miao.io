@@ -98,7 +98,7 @@ class OutboundMessageSerializationTest {
                 42L,
                 List.of(new SnapshotMessage.PlayerData(
                         "p1", "Alice", 100.0, 200.0, 22.0, 1.5,
-                        "mouse", "mouse", 100.0, 100.0, 0.0, 0L
+                        "mouse", "mouse", 100.0, 100.0, 0.0, 0.0, 0.0, 0L
                 )),
                 List.of(new SnapshotMessage.FoodData("f1", "berry", 300.0, 400.0)),
                 List.of(new SnapshotMessage.LeaderboardEntry("Alice", 0.0)),
@@ -150,7 +150,8 @@ class OutboundMessageSerializationTest {
     @Test
     void snapshotPlayerDataToMap() {
         SnapshotMessage.PlayerData pd = new SnapshotMessage.PlayerData(
-                "id1", "Bob", 50.0, 75.0, 28.0, 0.5, "rabbit", "rabbit", 150.0, 150.0, 50.0, 20L
+                "id1", "Bob", 50.0, 75.0, 28.0, 0.5, "rabbit", "rabbit",
+                150.0, 150.0, 50.0, 0.0, 0.0, 20L
         );
         Map<String, Object> map = pd.toMap();
 
@@ -165,6 +166,8 @@ class OutboundMessageSerializationTest {
         assertEquals(150.0, map.get("health"));
         assertEquals(150.0, map.get("maxHealth"));
         assertEquals(50.0, map.get("xp"));
+        assertEquals(0.0, map.get("oceanSurvival"));
+        assertEquals(0.0, map.get("maxOceanSurvival"));
         assertEquals(20L, map.get("abilityCooldownTicks"));
     }
 }

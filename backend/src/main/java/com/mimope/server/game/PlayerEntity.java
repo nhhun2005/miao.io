@@ -1,6 +1,7 @@
 package com.mimope.server.game;
 
 import com.mimope.server.game.data.AnimalDefinition;
+import com.mimope.server.game.data.Biome;
 import com.mimope.server.protocol.inbound.InputMessage;
 
 /**
@@ -24,6 +25,10 @@ public class PlayerEntity {
     // Stats
     private double health;
     private double xp;
+    private double oceanSurvival;
+    private double maxOceanSurvival;
+
+    private static final double OCEAN_SURVIVAL_SECONDS = 10.0;
 
     // Latest queued input (set by the WebSocket handler, consumed by the tick)
     private volatile InputMessage pendingInput;
@@ -49,6 +54,7 @@ public class PlayerEntity {
         this.angle = 0;
         this.health = animal.maxHealth();
         this.xp = 0;
+        resetOceanSurvival();
     }
 
     // ------------------------------------------------------------------ input queue
@@ -112,6 +118,11 @@ public class PlayerEntity {
         this.y = Math.max(r, Math.min(worldHeight - r, this.y));
     }
 
+    public void setPosition(double x, double y) {
+        this.x = x;
+        this.y = y;
+    }
+
     // ------------------------------------------------------------------ state changes
 
     public void addXp(double amount) {
@@ -141,6 +152,38 @@ public class PlayerEntity {
         this.skinId = skinId;
         this.health = animal.maxHealth();
         this.evolutionOptionsSent = false;
+        resetOceanSurvival();
+    }
+
+    public void updateOceanSurvival(Biome currentBiome, double deltaTime) {
+        if (!usesOceanSurvival()) {
+            resetOceanSurvival();
+            return;
+        }
+
+        if (currentBiome == Biome.OCEAN) {
+            this.oceanSurvival = this.maxOceanSurvival;
+            return;
+        }
+
+        this.oceanSurvival = Math.max(0, this.oceanSurvival - deltaTime);
+        if (this.oceanSurvival <= 0) {
+            kill();
+        }
+    }
+
+    private boolean usesOceanSurvival() {
+        return animal.biome() == Biome.OCEAN;
+    }
+
+    private void resetOceanSurvival() {
+        if (usesOceanSurvival()) {
+            this.maxOceanSurvival = OCEAN_SURVIVAL_SECONDS;
+            this.oceanSurvival = this.maxOceanSurvival;
+        } else {
+            this.maxOceanSurvival = 0;
+            this.oceanSurvival = 0;
+        }
     }
 
     public boolean canEvolveTo(AnimalDefinition target) {
@@ -238,6 +281,14 @@ public class PlayerEntity {
 
     public double getXp() {
         return xp;
+    }
+
+    public double getOceanSurvival() {
+        return oceanSurvival;
+    }
+
+    public double getMaxOceanSurvival() {
+        return maxOceanSurvival;
     }
 
     public double getRadius() {

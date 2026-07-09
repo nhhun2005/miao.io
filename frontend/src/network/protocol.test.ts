@@ -141,6 +141,8 @@ describe('parseServerMessage', () => {
           health: 100,
           maxHealth: 100,
           xp: 0,
+          oceanSurvival: 8.5,
+          maxOceanSurvival: 10,
           abilityCooldownTicks: 0,
         },
       ],
@@ -157,6 +159,8 @@ describe('parseServerMessage', () => {
       expect(msg.players).toHaveLength(1);
       expect(msg.players[0].id).toBe('p1');
       expect(msg.players[0].skinId).toBe('mouse');
+      expect(msg.players[0].oceanSurvival).toBe(8.5);
+      expect(msg.players[0].maxOceanSurvival).toBe(10);
       expect(msg.foods).toHaveLength(1);
       expect(msg.foods[0].foodId).toBe('berry');
       expect(msg.leaderboard).toHaveLength(1);

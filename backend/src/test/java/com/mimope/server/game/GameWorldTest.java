@@ -1,6 +1,7 @@
 package com.mimope.server.game;
 
 import com.mimope.server.game.data.AnimalDefinition;
+import com.mimope.server.game.data.Biome;
 import com.mimope.server.game.data.FoodDefinition;
 import com.mimope.server.protocol.inbound.InputMessage;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,6 +61,30 @@ class GameWorldTest {
                 "X should be within [radius, width-radius]");
         assertTrue(player.getY() >= r && player.getY() <= HEIGHT - r,
                 "Y should be within [radius, height-radius]");
+    }
+
+    @Test
+    void spawnPlayerUsesStarterAnimalBiome() {
+        PlayerEntity defaultPlayer = world.spawnPlayer("p1", "Default");
+        PlayerEntity oceanPlayer = world.spawnPlayer("p2", "Ocean", "shrimp");
+        PlayerEntity arcticPlayer = world.spawnPlayer("p3", "Arctic", "chipmunk");
+
+        assertEquals(Biome.LAND, world.biomeAt(defaultPlayer.getX(), defaultPlayer.getY()));
+        assertEquals(Biome.OCEAN, world.biomeAt(oceanPlayer.getX(), oceanPlayer.getY()));
+        assertEquals(Biome.ARCTIC, world.biomeAt(arcticPlayer.getX(), arcticPlayer.getY()));
+    }
+
+    @Test
+    void randomSpawnPointForBiomeReturnsPointInsideRequestedBiome() {
+        for (Biome biome : java.util.List.of(Biome.LAND, Biome.OCEAN, Biome.ARCTIC)) {
+            for (int i = 0; i < 20; i++) {
+                GameWorld.SpawnPoint point = world.randomSpawnPointForBiome(biome, 80);
+
+                assertEquals(biome, world.biomeAt(point.x(), point.y()));
+                assertTrue(point.x() >= 80 && point.x() <= WIDTH - 80);
+                assertTrue(point.y() >= 80 && point.y() <= HEIGHT - 80);
+            }
+        }
     }
 
     @Test
@@ -344,6 +369,28 @@ class GameWorldTest {
     }
 
     @Test
+    void evolvePlayerRelocatesToTargetAnimalBiome() {
+        PlayerEntity player = world.spawnPlayer("p1", "Alice", "shrimp");
+        player.addXp(50);
+
+        GameWorld.EvolutionResult landEvolution = world.evolvePlayer(player.getId(), "rabbit");
+
+        assertTrue(landEvolution.success());
+        assertEquals("rabbit", player.getAnimal().id());
+        assertEquals(Biome.LAND, world.biomeAt(player.getX(), player.getY()));
+
+        player.setAnimal(AnimalDefinition.byId("trout"));
+        player.addXp(200);
+        player.setPosition(WIDTH * 0.6, HEIGHT * 0.2);
+
+        GameWorld.EvolutionResult arcticEvolution = world.evolvePlayer(player.getId(), "penguin");
+
+        assertTrue(arcticEvolution.success());
+        assertEquals("penguin", player.getAnimal().id());
+        assertEquals(Biome.ARCTIC, world.biomeAt(player.getX(), player.getY()));
+    }
+
+    @Test
     void evolvePlayerRejectsSkippedTier() {
         PlayerEntity player = world.spawnPlayer("p1", "Alice");
         player.addXp(500);
@@ -352,6 +399,145 @@ class GameWorldTest {
 
         assertFalse(result.success());
         assertEquals("mouse", player.getAnimal().id());
+    }
+
+    @Test
+    void finalTierEvolutionOptionsMatchPlan() {
+        PlayerEntity player = world.spawnPlayer("p1", "Alice");
+        player.setAnimal(AnimalDefinition.byId("hippo"));
+        player.addXp(500_000);
+
+        assertEquals(
+                java.util.List.of("dragon", "kraken", "yeti"),
+                player.getAvailableEvolutionOptions().stream().map(AnimalDefinition::id).toList());
+    }
+
+    @Test
+    void blackdragonRequiresApexAnimalAndFinalXp() {
+        PlayerEntity player = world.spawnPlayer("p1", "Alice");
+        player.setAnimal(AnimalDefinition.byId("dragon"));
+        player.addXp(999_999);
+
+        assertFalse(world.evolvePlayer(player.getId(), "blackdragon").success());
+        assertEquals("dragon", player.getAnimal().id());
+
+        player.addXp(1);
+        GameWorld.EvolutionResult result = world.evolvePlayer(player.getId(), "blackdragon");
+
+        assertTrue(result.success());
+        assertEquals("blackdragon", player.getAnimal().id());
+    }
+
+    @Test
+    void blackdragonDoesNotForceBiomeRelocation() {
+        PlayerEntity player = world.spawnPlayer("p1", "Alice");
+        player.setAnimal(AnimalDefinition.byId("dragon"));
+        player.addXp(1_000_000);
+        player.setPosition(WIDTH * 0.1, HEIGHT * 0.8);
+        double x = player.getX();
+        double y = player.getY();
+
+        GameWorld.EvolutionResult result = world.evolvePlayer(player.getId(), "blackdragon");
+
+        assertTrue(result.success());
+        assertEquals("blackdragon", player.getAnimal().id());
+        assertEquals(x, player.getX());
+        assertEquals(y, player.getY());
+        assertEquals(Biome.OCEAN, world.biomeAt(player.getX(), player.getY()));
+    }
+
+    @Test
+    void movementMultiplierComparesAnimalLaneWithCurrentBiome() {
+        assertEquals(1.0, world.movementMultiplierFor(AnimalDefinition.byId("shark"), Biome.OCEAN));
+        assertEquals(0.75, world.movementMultiplierFor(AnimalDefinition.byId("shark"), Biome.LAND));
+        assertEquals(1.0, world.movementMultiplierFor(AnimalDefinition.byId("mammoth"), Biome.ARCTIC));
+        assertEquals(0.75, world.movementMultiplierFor(AnimalDefinition.byId("mammoth"), Biome.OCEAN));
+        assertEquals(1.0, world.movementMultiplierFor(AnimalDefinition.byId("blackdragon"), Biome.LAND));
+        assertEquals(1.0, world.movementMultiplierFor(AnimalDefinition.byId("blackdragon"), Biome.OCEAN));
+        assertEquals(1.0, world.movementMultiplierFor(AnimalDefinition.byId("blackdragon"), Biome.ARCTIC));
+    }
+
+    @Test
+    void oceanAnimalInOceanKeepsOceanSurvivalFull() {
+        PlayerEntity player = world.spawnPlayer("p1", "Shrimp", "shrimp");
+        setPlayerPosition(player, WIDTH * 0.1, HEIGHT * 0.5);
+
+        world.tick(3.0);
+
+        assertTrue(player.isAlive());
+        assertEquals(10.0, player.getOceanSurvival(), 0.01);
+        assertEquals(10.0, player.getMaxOceanSurvival(), 0.01);
+    }
+
+    @Test
+    void oceanAnimalOutsideOceanDrainsOceanSurvival() {
+        PlayerEntity player = world.spawnPlayer("p1", "Shrimp", "shrimp");
+        setPlayerPosition(player, WIDTH * 0.6, HEIGHT * 0.2);
+
+        world.tick(2.5);
+
+        assertTrue(player.isAlive());
+        assertEquals(7.5, player.getOceanSurvival(), 0.01);
+    }
+
+    @Test
+    void oceanAnimalDiesWhenOceanSurvivalReachesZero() {
+        PlayerEntity player = world.spawnPlayer("p1", "Shrimp", "shrimp");
+        setPlayerPosition(player, WIDTH * 0.6, HEIGHT * 0.2);
+
+        world.tick(10.1);
+
+        assertFalse(player.isAlive());
+        assertEquals(0.0, player.getOceanSurvival(), 0.01);
+        assertEquals(1, world.getDeathEvents().size());
+        assertEquals(DeathEvent.REASON_OCEAN_SURVIVAL, world.getDeathEvents().get(0).reason());
+    }
+
+    @Test
+    void oceanAnimalReturningToOceanRefillsOceanSurvival() {
+        PlayerEntity player = world.spawnPlayer("p1", "Shrimp", "shrimp");
+        setPlayerPosition(player, WIDTH * 0.6, HEIGHT * 0.2);
+
+        world.tick(4.0);
+        assertEquals(6.0, player.getOceanSurvival(), 0.01);
+
+        setPlayerPosition(player, WIDTH * 0.1, HEIGHT * 0.5);
+        world.tick(0.05);
+
+        assertTrue(player.isAlive());
+        assertEquals(10.0, player.getOceanSurvival(), 0.01);
+    }
+
+    @Test
+    void landAnimalOutsideOceanDoesNotUseOceanSurvivalDeath() {
+        PlayerEntity player = world.spawnPlayer("p1", "Mouse");
+        setPlayerPosition(player, WIDTH * 0.6, HEIGHT * 0.2);
+
+        world.tick(20.0);
+
+        assertTrue(player.isAlive());
+        assertEquals(0.0, player.getMaxOceanSurvival(), 0.01);
+        assertTrue(world.getDeathEvents().isEmpty());
+    }
+
+    @Test
+    void blackdragonDoesNotUseOceanSurvivalDeath() {
+        PlayerEntity player = world.spawnPlayer("p1", "Apex");
+        player.setAnimal(AnimalDefinition.byId("blackdragon"));
+        setPlayerPosition(player, WIDTH * 0.6, HEIGHT * 0.2);
+
+        world.tick(20.0);
+
+        assertTrue(player.isAlive());
+        assertEquals(0.0, player.getMaxOceanSurvival(), 0.01);
+        assertTrue(world.getDeathEvents().isEmpty());
+    }
+
+    @Test
+    void winterSkinRollUsesAnimalEligibilityAndThreshold() {
+        assertEquals("shark_winter", world.rollSkinId(AnimalDefinition.byId("shark"), 0.49));
+        assertEquals("shark", world.rollSkinId(AnimalDefinition.byId("shark"), 0.50));
+        assertEquals("chipmunk", world.rollSkinId(AnimalDefinition.byId("chipmunk"), 0.10));
     }
 
     // ------------------------------------------------------------------ predation and abilities
@@ -413,15 +599,6 @@ class GameWorldTest {
     }
 
     private void setPlayerPosition(PlayerEntity player, double x, double y) {
-        try {
-            Field xField = PlayerEntity.class.getDeclaredField("x");
-            Field yField = PlayerEntity.class.getDeclaredField("y");
-            xField.setAccessible(true);
-            yField.setAccessible(true);
-            xField.set(player, x);
-            yField.set(player, y);
-        } catch (ReflectiveOperationException ex) {
-            throw new AssertionError("Unable to position test player", ex);
-        }
+        player.setPosition(x, y);
     }
 }

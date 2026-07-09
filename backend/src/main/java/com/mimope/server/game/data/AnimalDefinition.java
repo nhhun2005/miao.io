@@ -4,6 +4,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Immutable definition of a playable animal type in the Mimope game.
@@ -21,7 +22,14 @@ public record AnimalDefinition(
         boolean normalEvolution
 ) {
 
-    private static final int FINAL_UNLOCK_XP = 3_000_000;
+    private static final int FINAL_UNLOCK_XP = 1_000_000;
+    private static final Set<String> WINTER_SKIN_IDS = Set.of(
+            "mouse", "shrimp", "rabbit", "trout", "mole", "crab", "pig", "seahorse",
+            "deer", "squid", "fox", "jellyfish", "zebra", "turtle", "cheetah",
+            "stingray", "gorilla", "pufferfish", "bear", "swordfish", "lion",
+            "croc", "octopus", "rhino", "shark", "hippo", "killerwhale", "dragon",
+            "kraken"
+    );
     private static final Map<String, AnimalDefinition> REGISTRY;
 
     static {
@@ -81,13 +89,13 @@ public record AnimalDefinition(
         add(map, "hippo", "Hippo", 13, 152, 72, 1_550, 250_000, Biome.LAND, "roar_pulse", true);
         add(map, "killerwhale", "Killer Whale", 13, 176, 74, 1_450, 250_000, Biome.OCEAN, "wave_pulse", true);
 
-        add(map, "mammoth", "Mammoth", 14, 145, 82, 1_900, 500_000, Biome.ARCTIC, "snowball_dash", true);
+        add(map, "mammoth", "Mammoth", 13, 145, 82, 1_900, 250_000, Biome.ARCTIC, "snowball_dash", true);
 
-        add(map, "dragon", "Dragon", 15, 162, 88, 2_300, 1_000_000, Biome.LAND, "fire_dash", true);
-        add(map, "kraken", "Kraken", 15, 150, 90, 2_400, 1_000_000, Biome.OCEAN, "whirlpool_pulse", true);
-        add(map, "yeti", "Yeti", 15, 154, 88, 2_350, 1_000_000, Biome.ARCTIC, "freeze_pulse", true);
+        add(map, "dragon", "Dragon", 14, 162, 88, 2_300, 500_000, Biome.LAND, "fire_dash", true);
+        add(map, "kraken", "Kraken", 14, 150, 90, 2_400, 500_000, Biome.OCEAN, "whirlpool_pulse", true);
+        add(map, "yeti", "Yeti", 14, 154, 88, 2_350, 500_000, Biome.ARCTIC, "freeze_pulse", true);
 
-        add(map, "blackdragon", "Black Dragon", 17, 156, 105, 3_500, FINAL_UNLOCK_XP, Biome.FINAL, "fire_dash", false);
+        add(map, "blackdragon", "Black Dragon", 15, 156, 105, 3_500, FINAL_UNLOCK_XP, Biome.FINAL, "fire_dash", false);
 
         REGISTRY = Collections.unmodifiableMap(map);
     }
@@ -161,6 +169,10 @@ public record AnimalDefinition(
     }
 
     public boolean canUnlockFinal(double xp) {
-        return (id.equals("dragon") || id.equals("kraken") || id.equals("yeti")) && xp >= FINAL_UNLOCK_XP;
+        return tier == 14 && (id.equals("dragon") || id.equals("kraken") || id.equals("yeti")) && xp >= FINAL_UNLOCK_XP;
+    }
+
+    public boolean hasWinterSkin() {
+        return WINTER_SKIN_IDS.contains(id);
     }
 }

@@ -175,6 +175,7 @@ public class GameRoom {
                 .toList();
 
         List<SnapshotMessage.KillEventData> killEvents = world.getDeathEvents().stream()
+                .filter(e -> e.killerId() != null)
                 .map(e -> new SnapshotMessage.KillEventData(
                         e.victimId(),
                         e.killerId(),
@@ -272,7 +273,7 @@ public class GameRoom {
             }
 
             DeathMessage message = new DeathMessage(
-                    "eaten",
+                    event.reason(),
                     event.killerNickname(),
                     event.xpAwarded(),
                     event.survivalTimeMs()
@@ -294,6 +295,8 @@ public class GameRoom {
                 p.getHealth(),
                 p.getMaxHealth(),
                 p.getXp(),
+                p.getOceanSurvival(),
+                p.getMaxOceanSurvival(),
                 p.getAbilityCooldownRemainingTicks(world.getTick())
         );
     }

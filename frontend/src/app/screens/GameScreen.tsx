@@ -3,7 +3,7 @@ import { useUIStore } from '../../state/uiStore';
 import { useInputStore } from '../../state/inputStore';
 import { useGameStore } from '../../state/gameStore';
 import { GameCanvas } from '../../game/GameCanvas';
-import { ANIMALS, getEvolutionOptions } from '../../game/data/animals';
+import { ANIMALS, getAnimalPreviewPath, getEvolutionOptions } from '../../game/data/animals';
 import { Button, Modal } from '../../ui';
 import type { GameConnection } from '../../network/GameConnection';
 
@@ -237,7 +237,7 @@ export function GameScreen() {
           </p>
           <div className="evolution-modal__options">
             {evolutionOptions.map((option) => {
-              const animal = ANIMALS[option.animalId];
+              const previewPath = getAnimalPreviewPath(option.animalId);
               return (
                 <button
                   key={option.animalId}
@@ -247,10 +247,10 @@ export function GameScreen() {
                     clearEvolutionOptions();
                   }}
                 >
-                  {animal?.fullSizePath && (
+                  {previewPath && (
                     <img
                       className="evolution-card__image"
-                      src={`/${animal.fullSizePath}`}
+                      src={`/${previewPath}`}
                       alt=""
                     />
                   )}

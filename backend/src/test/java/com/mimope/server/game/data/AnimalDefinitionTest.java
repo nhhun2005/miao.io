@@ -74,7 +74,7 @@ class AnimalDefinitionTest {
                 .map(AnimalDefinition::tier)
                 .collect(Collectors.toSet());
 
-        assertEquals(Set.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17), tiers);
+        assertEquals(Set.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15), tiers);
     }
 
     @Test
@@ -113,13 +113,13 @@ class AnimalDefinitionTest {
         List<String> hippoOptions = AnimalDefinition.byId("hippo").evolutionOptions().stream()
                 .map(AnimalDefinition::id)
                 .toList();
-        List<String> mammothOptions = AnimalDefinition.byId("mammoth").evolutionOptions().stream()
+        List<String> dragonOptions = AnimalDefinition.byId("dragon").evolutionOptions().stream()
                 .map(AnimalDefinition::id)
                 .toList();
 
         assertEquals(List.of("rabbit", "arctichare", "trout"), mouseOptions);
-        assertEquals(List.of("mammoth"), hippoOptions);
-        assertEquals(List.of("dragon", "kraken", "yeti"), mammothOptions);
+        assertEquals(List.of("dragon", "kraken", "yeti"), hippoOptions);
+        assertEquals(List.of(), dragonOptions);
     }
 
     @Test
@@ -128,9 +128,24 @@ class AnimalDefinitionTest {
         AnimalDefinition blackdragon = AnimalDefinition.byId("blackdragon");
 
         assertTrue(dragon.evolutionOptions().isEmpty());
-        assertFalse(dragon.canUnlockFinal(2_999_999));
-        assertTrue(dragon.canUnlockFinal(3_000_000));
+        assertFalse(dragon.canUnlockFinal(999_999));
+        assertTrue(dragon.canUnlockFinal(1_000_000));
+        assertFalse(AnimalDefinition.byId("hippo").canUnlockFinal(1_000_000));
         assertFalse(blackdragon.normalEvolution());
+    }
+
+    @Test
+    void finalTierMappingMatchesPlan() {
+        assertEquals(13, AnimalDefinition.byId("mammoth").tier());
+        assertEquals(250_000, AnimalDefinition.byId("mammoth").xpRequired());
+        assertEquals(14, AnimalDefinition.byId("dragon").tier());
+        assertEquals(500_000, AnimalDefinition.byId("dragon").xpRequired());
+        assertEquals(14, AnimalDefinition.byId("kraken").tier());
+        assertEquals(500_000, AnimalDefinition.byId("kraken").xpRequired());
+        assertEquals(14, AnimalDefinition.byId("yeti").tier());
+        assertEquals(500_000, AnimalDefinition.byId("yeti").xpRequired());
+        assertEquals(15, AnimalDefinition.byId("blackdragon").tier());
+        assertEquals(1_000_000, AnimalDefinition.byId("blackdragon").xpRequired());
     }
 
     @Test

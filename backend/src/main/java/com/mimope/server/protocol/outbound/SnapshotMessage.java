@@ -45,6 +45,8 @@ public record SnapshotMessage(
             double health,
             double maxHealth,
             double xp,
+            double oceanSurvival,
+            double maxOceanSurvival,
             long abilityCooldownTicks
     ) {
         public Map<String, Object> toMap() {
@@ -60,6 +62,8 @@ public record SnapshotMessage(
             m.put("health", health);
             m.put("maxHealth", maxHealth);
             m.put("xp", xp);
+            m.put("oceanSurvival", oceanSurvival);
+            m.put("maxOceanSurvival", maxOceanSurvival);
             m.put("abilityCooldownTicks", abilityCooldownTicks);
             return m;
         }

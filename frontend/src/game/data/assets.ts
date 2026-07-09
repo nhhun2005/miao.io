@@ -134,3 +134,27 @@ export function buildAssetManifest(basePath: string = '/'): AssetEntry[] {
 
   return entries;
 }
+
+export function buildGameplaySkinKeys(): string[] {
+  const keys: string[] = [];
+
+  for (const animal of Object.values(ANIMALS) as AnimalDefinition[]) {
+    keys.push(animalSkinKey(animal.id));
+    if (animal.winterSkinPath) {
+      keys.push(`${animalSkinKey(animal.id)}_winter`);
+    }
+  }
+
+  for (const variant of Object.values(ANIMAL_VARIANTS)) {
+    keys.push(animalSkinKey(variant.id));
+    if (variant.winterSkinPath) {
+      keys.push(`${animalSkinKey(variant.id)}_winter`);
+    }
+  }
+
+  for (const aiAnimal of Object.values(AI_ANIMALS)) {
+    keys.push(animalSkinKey(aiAnimal.id));
+  }
+
+  return keys;
+}

@@ -112,6 +112,8 @@ export interface SnapshotPlayerData {
   health: number;
   maxHealth: number;
   xp: number;
+  oceanSurvival?: number;
+  maxOceanSurvival?: number;
   abilityCooldownTicks: number;
 }
 

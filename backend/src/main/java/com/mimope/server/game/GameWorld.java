@@ -1,7 +1,6 @@
 package com.mimope.server.game;
 
 import com.mimope.server.game.data.AnimalDefinition;
-import com.mimope.server.game.data.AnimalVariantDefinition;
 import com.mimope.server.game.data.Biome;
 import com.mimope.server.game.data.FoodDefinition;
 import com.mimope.server.protocol.inbound.InputMessage;
@@ -116,12 +115,15 @@ public class GameWorld {
                     abilityEvents.add(new AbilityEvent(
                             player.getId(), player.getAnimal().abilityId(), player.getX(), player.getY(), input.angle()));
                 }
-                double biomeMultiplier = movementMultiplierAt(player.getX(), player.getY());
+                double biomeMultiplier = movementMultiplierFor(player.getAnimal(), biomeAt(player.getX(), player.getY()));
                 player.applyMovement(input, deltaTime, width, height, abilityMultiplier * biomeMultiplier);
             }
         }
 
-        // 2. Rebuild spatial grid with current entity positions for collision queries.
+        // 2. Drain ocean survival for ocean animals that are away from the ocean.
+        checkOceanSurvival(deltaTime);
+
+        // 3. Rebuild spatial grid with current entity positions for collision queries.
         rebuildSpatialGrid();
 
         // 3. Check food collisions using spatial grid — award XP, remove collected food
@@ -164,6 +166,29 @@ public class GameWorld {
         }
         for (FoodEntity food : foods.values()) {
             spatialGrid.insert(food);
+        }
+    }
+
+    private void checkOceanSurvival(double deltaTime) {
+        for (PlayerEntity player : players.values()) {
+            if (!player.isAlive()) {
+                continue;
+            }
+
+            player.updateOceanSurvival(biomeAt(player.getX(), player.getY()), deltaTime);
+            if (!player.isAlive()) {
+                long spawnedAt = playerSpawnMs.getOrDefault(player.getId(), System.currentTimeMillis());
+                deathEvents.add(new DeathEvent(
+                        player.getId(),
+                        null,
+                        null,
+                        DeathEvent.REASON_OCEAN_SURVIVAL,
+                        player.getX(),
+                        player.getY(),
+                        0.0,
+                        Math.max(0, System.currentTimeMillis() - spawnedAt)
+                ));
+            }
         }
     }
 
@@ -321,6 +346,7 @@ public class GameWorld {
                         prey.getId(),
                         predator.getId(),
                         predator.getNickname(),
+                        DeathEvent.REASON_EATEN,
                         prey.getX(),
                         prey.getY(),
                         xpAwarded,
@@ -349,15 +375,14 @@ public class GameWorld {
         AnimalDefinition starter = AnimalDefinition.isValidStarter(starterAnimalId)
                 ? AnimalDefinition.byId(starterAnimalId == null || starterAnimalId.isBlank() ? "mouse" : starterAnimalId)
                 : AnimalDefinition.starter();
-        double x = randomRange(starter.radius(), width - starter.radius());
-        double y = randomRange(starter.radius(), height - starter.radius());
+        SpawnPoint spawnPoint = randomSpawnPointForBiome(starter.biome(), starter.radius());
 
-        PlayerEntity player = new PlayerEntity(playerId, nickname, starter, x, y);
+        PlayerEntity player = new PlayerEntity(playerId, nickname, starter, spawnPoint.x(), spawnPoint.y());
         player.setAnimal(starter, rollSkinId(starter));
         players.put(playerId, player);
         playerSpawnMs.put(playerId, System.currentTimeMillis());
 
-        log.info("Player spawned: {} at ({}, {})", player, x, y);
+        log.info("Player spawned: {} at ({}, {})", player, spawnPoint.x(), spawnPoint.y());
         return player;
     }
 
@@ -475,6 +500,7 @@ public class GameWorld {
                     playerId,
                     null,
                     "Test",
+                    DeathEvent.REASON_EATEN,
                     victim.getX(),
                     victim.getY(),
                     0.0,
@@ -499,6 +525,11 @@ public class GameWorld {
         }
 
         player.setAnimal(target, rollSkinId(target));
+        if (target.biome() != Biome.FINAL) {
+            SpawnPoint spawnPoint = randomSpawnPointForBiome(target.biome(), target.radius());
+            player.setPosition(spawnPoint.x(), spawnPoint.y());
+            rebuildSpatialGrid();
+        }
         return EvolutionResult.success(player);
     }
 
@@ -532,17 +563,69 @@ public class GameWorld {
         return Biome.LAND;
     }
 
-    public double movementMultiplierAt(double x, double y) {
-        return switch (biomeAt(x, y)) {
-            case LAND -> 1.0;
-            case OCEAN -> 0.78;
-            case ARCTIC -> 0.86;
-            case FINAL -> 1.0;
+    public SpawnPoint randomSpawnPointForBiome(Biome biome, double radius) {
+        Biome targetBiome = biome == Biome.FINAL ? Biome.LAND : biome;
+
+        for (int attempt = 0; attempt < 100; attempt++) {
+            SpawnPoint candidate = randomSpawnPointCandidate(targetBiome, radius);
+            if (biomeAt(candidate.x(), candidate.y()) == targetBiome) {
+                return candidate;
+            }
+        }
+
+        return fallbackSpawnPointForBiome(targetBiome, radius);
+    }
+
+    private SpawnPoint randomSpawnPointCandidate(Biome biome, double radius) {
+        double oceanRight = width * 0.28;
+        double arcticTop = height * 0.64;
+
+        return switch (biome) {
+            case OCEAN -> new SpawnPoint(
+                    randomRange(radius, Math.max(radius, oceanRight - radius)),
+                    randomRange(radius, height - radius));
+            case ARCTIC -> new SpawnPoint(
+                    randomRange(Math.min(width - radius, oceanRight + radius), width - radius),
+                    randomRange(Math.min(height - radius, arcticTop + radius), height - radius));
+            case LAND, FINAL -> new SpawnPoint(
+                    randomRange(Math.min(width - radius, oceanRight + radius), width - radius),
+                    randomRange(radius, Math.max(radius, arcticTop - radius)));
         };
     }
 
+    private SpawnPoint fallbackSpawnPointForBiome(Biome biome, double radius) {
+        double oceanCenterX = width * 0.14;
+        double landCenterX = width * 0.64;
+        double landCenterY = height * 0.32;
+        double arcticCenterY = height * 0.82;
+
+        return switch (biome) {
+            case OCEAN -> new SpawnPoint(clamp(oceanCenterX, radius, width - radius), clamp(height * 0.5, radius, height - radius));
+            case ARCTIC -> new SpawnPoint(clamp(landCenterX, radius, width - radius), clamp(arcticCenterY, radius, height - radius));
+            case LAND, FINAL -> new SpawnPoint(clamp(landCenterX, radius, width - radius), clamp(landCenterY, radius, height - radius));
+        };
+    }
+
+    public double movementMultiplierAt(PlayerEntity player) {
+        return movementMultiplierFor(player.getAnimal(), biomeAt(player.getX(), player.getY()));
+    }
+
+    public double movementMultiplierFor(AnimalDefinition animal, Biome currentBiome) {
+        if (animal.biome() == Biome.FINAL || currentBiome == Biome.FINAL) {
+            return 1.0;
+        }
+        return animal.biome() == currentBiome ? 1.0 : 0.75;
+    }
+
     private static double randomRange(double min, double max) {
+        if (max <= min) {
+            return min;
+        }
         return min + ThreadLocalRandom.current().nextDouble() * (max - min);
+    }
+
+    private static double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private double applyAbility(PlayerEntity player, InputMessage input) {
@@ -630,11 +713,12 @@ public class GameWorld {
     }
 
     private String rollSkinId(AnimalDefinition animal) {
-        for (AnimalVariantDefinition variant : AnimalVariantDefinition.all().values()) {
-            if (variant.baseAnimalId().equals(animal.id())
-                    && ThreadLocalRandom.current().nextDouble() < variant.rollRate()) {
-                return variant.id();
-            }
+        return rollSkinId(animal, ThreadLocalRandom.current().nextDouble());
+    }
+
+    String rollSkinId(AnimalDefinition animal, double roll) {
+        if (animal.hasWinterSkin() && roll < 0.5) {
+            return animal.id() + "_winter";
         }
         return animal.id();
     }
@@ -657,5 +741,8 @@ public class GameWorld {
         public static EvolutionResult failure(String error) {
             return new EvolutionResult(false, error, null);
         }
+    }
+
+    public record SpawnPoint(double x, double y) {
     }
 }

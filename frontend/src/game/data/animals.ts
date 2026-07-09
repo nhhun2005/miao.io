@@ -134,11 +134,11 @@ export const ANIMALS: Record<string, AnimalDefinition> = {
   wolverine: animal('wolverine', 'Wolverine', 12, 174, 62, 1120, 125000, 'arctic', 'claw', 'skins/arctic/wolverine.png'),
   hippo: animal('hippo', 'Hippo', 13, 152, 72, 1550, 250000, 'land', 'roar_pulse', 'skins/hippo.png', 'skins/fullsize/hippo.png', 'skins/winter/hippo.png'),
   killerwhale: animal('killerwhale', 'Killer Whale', 13, 176, 74, 1450, 250000, 'ocean', 'wave_pulse', 'skins/killerwhale.png', null, 'skins/winter/killerwhale.png'),
-  mammoth: animal('mammoth', 'Mammoth', 14, 145, 82, 1900, 500000, 'arctic', 'snowball_dash', 'skins/arctic/mammoth.png'),
-  dragon: animal('dragon', 'Dragon', 15, 162, 88, 2300, 1000000, 'land', 'fire_dash', 'skins/dragon.png', 'skins/fullsize/dragon.png', 'skins/winter/dragon.png'),
-  kraken: animal('kraken', 'Kraken', 15, 150, 90, 2400, 1000000, 'ocean', 'whirlpool_pulse', 'skins/kraken.png', 'skins/fullsize/kraken.png', 'skins/winter/kraken.png'),
-  yeti: animal('yeti', 'Yeti', 15, 154, 88, 2350, 1000000, 'arctic', 'freeze_pulse', 'skins/arctic/yeti.png'),
-  blackdragon: animal('blackdragon', 'Black Dragon', 17, 156, 105, 3500, 3000000, 'final', 'fire_dash', 'skins/blackdragon.png', null, undefined, false),
+  mammoth: animal('mammoth', 'Mammoth', 13, 145, 82, 1900, 250000, 'arctic', 'snowball_dash', 'skins/arctic/mammoth.png'),
+  dragon: animal('dragon', 'Dragon', 14, 162, 88, 2300, 500000, 'land', 'fire_dash', 'skins/dragon.png', 'skins/fullsize/dragon.png', 'skins/winter/dragon.png'),
+  kraken: animal('kraken', 'Kraken', 14, 150, 90, 2400, 500000, 'ocean', 'whirlpool_pulse', 'skins/kraken.png', 'skins/fullsize/kraken.png', 'skins/winter/kraken.png'),
+  yeti: animal('yeti', 'Yeti', 14, 154, 88, 2350, 500000, 'arctic', 'freeze_pulse', 'skins/arctic/yeti.png'),
+  blackdragon: animal('blackdragon', 'Black Dragon', 15, 156, 105, 3500, 1000000, 'final', 'fire_dash', 'skins/blackdragon.png', null, undefined, false),
 };
 
 export const ANIMAL_VARIANTS: Record<string, AnimalVariantDefinition> = {
@@ -173,4 +173,10 @@ export function getEvolutionOptions(currentAnimalId: string): AnimalDefinition[]
   return Object.values(ANIMALS)
     .filter((animal) => animal.normalEvolution && animal.tier === nextTier)
     .sort((a, b) => a.biome.localeCompare(b.biome) || a.name.localeCompare(b.name));
+}
+
+export function getAnimalPreviewPath(animalId: string): string | null {
+  const animal = ANIMALS[animalId];
+  if (!animal) return null;
+  return animal.fullSizePath ?? animal.skinPath;
 }
