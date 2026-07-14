@@ -71,6 +71,14 @@ public class GameWorld {
     private static final long BITE_COOLDOWN_TICKS = 20;
     private static final double BITE_ARC_RADIANS = Math.PI * 2.0 / 3.0;
 
+    /**
+     * Height in world pixels of the river band that crosses the land biome.
+     * Mirrors the river rectangle drawn client-side in
+     * PixiGame.renderBackground so the visual and the water source align.
+     */
+    private static final double RIVER_HEIGHT = 150.0;
+
+
     private long tick = 0;
 
     /**
@@ -724,12 +732,16 @@ public class GameWorld {
     }
 
     /**
-     * Whether the given point is inside a drinking-water source: either the
-     * ocean biome or one of the land/arctic puddles. Aquatic animals refill
-     * their drinking-water bar while inside a water source.
+     * Whether the given point is inside a drinking-water source: the ocean
+     * biome, the river crossing the land, or one of the land/arctic puddles.
+     * Aquatic animals refill their drinking-water bar while inside a water
+     * source.
      */
     public boolean isInWaterSource(double x, double y) {
         if (biomeAt(x, y) == Biome.OCEAN) {
+            return true;
+        }
+        if (isInRiver(x, y)) {
             return true;
         }
         for (Puddle puddle : puddles) {
@@ -741,6 +753,19 @@ public class GameWorld {
         }
         return false;
     }
+
+    /**
+     * Whether the given point falls within the river band that crosses the
+     * land biome. The band spans from the land's western edge to the eastern
+     * world edge. Coordinates mirror the river rectangle drawn client-side in
+     * PixiGame.renderBackground so the visual and the water source line up.
+     */
+    private boolean isInRiver(double x, double y) {
+        double riverTop = height * 0.42;
+        double riverBottom = riverTop + RIVER_HEIGHT;
+        return x >= width * 0.28 && y >= riverTop && y <= riverBottom;
+    }
+
 
     /** Read-only view of the water puddles for rendering / snapshots. */
     public List<Puddle> getPuddles() {
