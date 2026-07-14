@@ -74,6 +74,10 @@ interface PlayerRenderState {
   nameLabel: Text;
   healthBar: Graphics;
   oceanSurvivalBar: Graphics;
+  /** Colored outline ring drawn around the animal. */
+  border: Graphics;
+  /** Green counter-attack hitbox marker drawn at the tail. */
+  tailHitbox: Graphics;
   // Current displayed position (interpolated)
   displayX: number;
   displayY: number;
@@ -96,8 +100,17 @@ interface PlayerRenderState {
 /** State tracked per rendered food sprite. */
 interface FoodRenderState {
   sprite: Sprite;
+  /** Colored outline ring showing whether the local player can eat it. */
+  border: Graphics;
   foodId: string;
+  /** Minimum animal tier required to eat this food. */
+  minTier: number;
+  /** Base radius of the food sprite. */
+  radius: number;
+  /** Whether the border currently reflects an edible state (cache key). */
+  edible: boolean | null;
 }
+
 
 /** A floating "+XP" text effect that fades out. */
 interface FoodPickupEffect {
@@ -219,7 +232,7 @@ export class PixiGame {
     this.app = new Application();
 
     await this.app.init({
-      background: '#1a5c2a',
+      background: '#2ecc71',
       resizeTo: this.container,
       antialias: true,
       autoDensity: true,
@@ -403,9 +416,9 @@ export class PixiGame {
   private renderBackground(): void {
     const bg = new Graphics();
 
-    // Solid green background
+    // Solid green background — fresher, more vivid grass tone
     bg.rect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-    bg.fill(0x1a5c2a);
+    bg.fill(0x2ecc71);
 
     // Ocean biome on the west side
     bg.rect(0, 0, WORLD_WIDTH * 0.28, WORLD_HEIGHT);
@@ -448,7 +461,7 @@ export class PixiGame {
 
 
     // Grid lines
-    bg.setStrokeStyle({ width: 1, color: 0x1e6b30, alpha: 0.5 });
+    bg.setStrokeStyle({ width: 1, color: 0x27ae60, alpha: 0.5 });
 
     for (let x = 0; x <= WORLD_WIDTH; x += BG_GRID_SIZE) {
       bg.moveTo(x, 0);
@@ -669,11 +682,23 @@ export class PixiGame {
     sprite.anchor.set(0.5);
     sprite.width = p.radius * 2;
     sprite.height = p.radius * 2;
+
+    // Tail counter-attack hitbox marker — drawn beneath the sprite so it
+    // reads as a glowing patch behind the animal. Only shown for players
+    // whose tier is higher than the local player (see updatePlayerAdornments).
+    const tailHitbox = new Graphics();
+    playerContainer.addChild(tailHitbox);
+
+    // Colored threat/edible outline ring — drawn beneath the sprite.
+    const border = new Graphics();
+    playerContainer.addChild(border);
+
     playerContainer.addChild(sprite);
 
     // Nickname label
     const localPlayerId = useGameStore.getState().localPlayerId;
     const isLocalPlayer = p.id === localPlayerId;
+
 
     const labelStyle = new TextStyle({
       fontSize: 14,
@@ -705,6 +730,8 @@ export class PixiGame {
       nameLabel,
       healthBar,
       oceanSurvivalBar,
+      border,
+      tailHitbox,
       displayX: p.x,
       displayY: p.y,
       displayAngle: p.angle,
@@ -786,12 +813,57 @@ export class PixiGame {
     for (const [id, state] of this.foodSprites) {
       if (!seenIds.has(id)) {
         this.layerFood.removeChild(state.sprite);
+        this.layerFood.removeChild(state.border);
+        state.border.destroy();
         state.sprite.visible = false;
         this.foodSpritePool.push(state.sprite);
         this.foodSprites.delete(id);
       }
     }
+
+    // Refresh edible/non-edible borders based on the local player's tier.
+    this.updateFoodBorders();
   }
+
+  /**
+   * Resolve the tier of the local player's current animal, or `null` if the
+   * local player is not yet present in the scene.
+   */
+  private getLocalPlayerTier(): number | null {
+    const localPlayerId = useGameStore.getState().localPlayerId;
+    if (!localPlayerId) return null;
+    const local = this.playerSprites.get(localPlayerId);
+    if (!local) return null;
+    return ANIMALS[local.animalId]?.tier ?? null;
+  }
+
+  /**
+   * Draw an outline around each food item: deep-blue when the local player's
+   * tier is high enough to eat it, black when it cannot yet be eaten.
+   */
+  private updateFoodBorders(): void {
+    const localTier = this.getLocalPlayerTier();
+
+    for (const [, state] of this.foodSprites) {
+      // Until we know the local player's tier, treat everything as edible so
+      // the border doesn't flash black on first spawn.
+      const edible = localTier === null ? true : localTier >= state.minTier;
+
+      // Skip redraw if the edible state hasn't changed for this item.
+      if (state.edible === edible) continue;
+      state.edible = edible;
+
+      const g = state.border;
+      g.clear();
+      g.circle(0, 0, state.radius + 3);
+      g.stroke({
+        width: 3,
+        color: edible ? 0x1e3a8a : 0x000000,
+        alpha: edible ? 0.95 : 0.75,
+      });
+    }
+  }
+
 
   private createFoodSprite(f: FoodSnapshot): FoodRenderState {
     const foodDef = FOODS[f.foodId];
@@ -828,8 +900,18 @@ export class PixiGame {
 
     this.layerFood.addChild(sprite);
 
-    return { sprite, foodId: f.foodId };
+    // Edible/non-edible outline ring, drawn beneath the food sprite so the
+    // artwork stays readable. Colour is decided later in updateFoodBorders
+    // based on the local player's tier.
+    const border = new Graphics();
+    border.position.set(f.x, f.y);
+    this.layerFood.addChildAt(border, this.layerFood.getChildIndex(sprite));
+
+    const minTier = foodDef?.minTier ?? 1;
+
+    return { sprite, border, foodId: f.foodId, minTier, radius, edible: null };
   }
+
 
   // -----------------------------------------------------------------------
   // Food pickup visual effects
@@ -1020,6 +1102,7 @@ export class PixiGame {
 
     this.syncLatestStoreSnapshot();
     this.interpolatePlayers();
+    this.updatePlayerAdornments();
     this.updateHealthBars();
     this.updatePickupEffects(dt);
     this.updateEvolutionEffects(dt);
@@ -1127,10 +1210,64 @@ export class PixiGame {
   }
 
   // -----------------------------------------------------------------------
+  // Player adornments — threat/edible border ring and tail counter-attack box
+  // -----------------------------------------------------------------------
+
+  /**
+   * Draw the outline ring and tail hitbox marker for every player relative to
+   * the local player's tier:
+   *
+   * - Higher-tier opponents (a threat) get a red ring and a green tail patch
+   *   marking the counter-attack hitbox you can bite to fight back.
+   * - Same-or-lower-tier players (and the local player) get a plain black ring
+   *   and no tail marker.
+   */
+  private updatePlayerAdornments(): void {
+    const localPlayerId = useGameStore.getState().localPlayerId;
+    const localTier = this.getLocalPlayerTier();
+
+    for (const [id, state] of this.playerSprites) {
+      const isLocalPlayer = id === localPlayerId;
+      const tier = ANIMALS[state.animalId]?.tier ?? 1;
+      // A higher-tier opponent is a threat worth marking. The local player is
+      // never a threat to itself.
+      const isHigherTier = !isLocalPlayer && localTier !== null && tier > localTier;
+
+      // Threat/edible outline ring.
+      const border = state.border;
+      border.clear();
+      border.circle(0, 0, state.radius + 4);
+      border.stroke({
+        width: 4,
+        color: isHigherTier ? 0xff2d2d : 0x000000,
+        alpha: isHigherTier ? 0.95 : 0.7,
+      });
+
+      // Green counter-attack tail hitbox — only for higher-tier threats. The
+      // marker sits behind the animal (opposite the facing direction) and
+      // rotates with the body so it always tracks the tail.
+      const tail = state.tailHitbox;
+      tail.clear();
+      if (isHigherTier) {
+        const tailDistance = state.radius * 0.85;
+        const tailRadius = Math.max(6, state.radius * 0.45);
+        // displayAngle points in the facing direction; the tail is opposite.
+        const tx = -Math.cos(state.displayAngle) * tailDistance;
+        const ty = -Math.sin(state.displayAngle) * tailDistance;
+        tail.circle(tx, ty, tailRadius);
+        tail.fill({ color: 0x22ff66, alpha: 0.4 });
+        tail.circle(tx, ty, tailRadius);
+        tail.stroke({ width: 2, color: 0x16a34a, alpha: 0.9 });
+      }
+    }
+  }
+
+  // -----------------------------------------------------------------------
   // Health bars
   // -----------------------------------------------------------------------
 
   private updateHealthBars(): void {
+
     for (const [, state] of this.playerSprites) {
       const bar = state.healthBar;
       bar.clear();
