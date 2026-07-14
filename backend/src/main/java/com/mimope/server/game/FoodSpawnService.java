@@ -32,6 +32,14 @@ public class FoodSpawnService {
      */
     private static final double DESPAWN_RATE = 0.05;
 
+    /**
+     * Extra margin (pixels) added around a player's reach when protecting
+     * nearby food from age-based despawn. Prevents food from vanishing just
+     * as a player approaches to eat it.
+     */
+    private static final double DESPAWN_PROTECT_MARGIN = 120.0;
+
+
     private final double worldWidth;
     private final double worldHeight;
     private final int maxFood;
@@ -90,12 +98,34 @@ public class FoodSpawnService {
      * @param currentTick  the current world tick
      */
     public void despawnStaleFood(Map<String, FoodEntity> currentFoods, long currentTick) {
+        despawnStaleFood(currentFoods, currentTick, Collections.emptyList());
+    }
+
+    /**
+     * Despawn stale food items that have existed longer than {@link #MAX_FOOD_AGE_TICKS}.
+     * Only removes a fraction per tick to avoid sudden mass removal.
+     * <p>
+     * Food within reach of any alive player is skipped so that items do not
+     * vanish just as a player approaches to eat them.
+     *
+     * @param currentFoods the current food map (mutated in place)
+     * @param currentTick  the current world tick
+     * @param players      alive players used to protect nearby food from despawn
+     */
+    public void despawnStaleFood(Map<String, FoodEntity> currentFoods,
+                                 long currentTick,
+                                 Collection<PlayerEntity> players) {
         List<String> staleIds = new ArrayList<>();
 
         for (Map.Entry<String, Long> entry : foodSpawnTick.entrySet()) {
-            if (currentTick - entry.getValue() > MAX_FOOD_AGE_TICKS) {
-                staleIds.add(entry.getKey());
+            if (currentTick - entry.getValue() <= MAX_FOOD_AGE_TICKS) {
+                continue;
             }
+            FoodEntity food = currentFoods.get(entry.getKey());
+            if (food != null && isNearAnyPlayer(food, players)) {
+                continue; // Don't yank food out from under an approaching player
+            }
+            staleIds.add(entry.getKey());
         }
 
         if (staleIds.isEmpty()) return;
@@ -109,6 +139,21 @@ public class FoodSpawnService {
             currentFoods.remove(id);
             foodSpawnTick.remove(id);
         }
+    }
+
+    private boolean isNearAnyPlayer(FoodEntity food, Collection<PlayerEntity> players) {
+        for (PlayerEntity player : players) {
+            if (!player.isAlive()) {
+                continue;
+            }
+            double dx = player.getX() - food.getX();
+            double dy = player.getY() - food.getY();
+            double reach = player.getRadius() + food.getRadius() + DESPAWN_PROTECT_MARGIN;
+            if (dx * dx + dy * dy <= reach * reach) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

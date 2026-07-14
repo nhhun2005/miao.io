@@ -73,6 +73,14 @@ public class GameWorld {
 
     private long tick = 0;
 
+    /**
+     * Water puddles scattered across the land and arctic biomes. Aquatic
+     * animals refill their drinking-water bar while standing in one, just as
+     * they do in the ocean. Positions are expressed as fractions of the world
+     * size so they stay consistent with the frontend rendering.
+     */
+    private final List<Puddle> puddles;
+
     public GameWorld(double width, double height, int maxFood) {
         this(width, height, maxFood, 200.0);
     }
@@ -83,7 +91,25 @@ public class GameWorld {
         this.maxFood = maxFood;
         this.foodSpawnService = new FoodSpawnService(width, height, maxFood, foodIdCounter);
         this.spatialGrid = new SpatialGrid(width, height, cellSize);
+        this.puddles = buildPuddles(width, height);
     }
+
+    private static List<Puddle> buildPuddles(double width, double height) {
+        return List.of(
+                // Grassland ponds
+                new Puddle(width * 0.45, height * 0.22, 190),
+                new Puddle(width * 0.72, height * 0.14, 150),
+                new Puddle(width * 0.86, height * 0.46, 210),
+                new Puddle(width * 0.55, height * 0.38, 170),
+                new Puddle(width * 0.38, height * 0.52, 160),
+                // Arctic ponds (southern band)
+                new Puddle(width * 0.48, height * 0.80, 180),
+                new Puddle(width * 0.80, height * 0.88, 200),
+                new Puddle(width * 0.64, height * 0.72, 170)
+        );
+    }
+
+
 
     // ------------------------------------------------------------------ tick
 
@@ -123,8 +149,9 @@ public class GameWorld {
             }
         }
 
-        // 2. Drain ocean survival for ocean animals that are away from the ocean.
-        checkOceanSurvival(deltaTime);
+        // 2. Update every creature's drinking-water bar (refill in water,
+        // dehydrate when empty on land).
+        checkWater(deltaTime);
 
         // 3. Rebuild spatial grid with current entity positions for collision queries.
         rebuildSpatialGrid();
@@ -138,8 +165,9 @@ public class GameWorld {
         // 5. Send evolution options once a player has enough XP for the next tier.
         checkEvolutionOptions();
 
-        // 4. Despawn stale food
-        foodSpawnService.despawnStaleFood(foods, tick);
+        // 4. Despawn stale food (protecting items near players so they don't
+        // vanish just as someone approaches to eat them).
+        foodSpawnService.despawnStaleFood(foods, tick, players.values());
 
         // 5. Replenish food if under the cap
         foodSpawnService.replenishFood(foods, tick);
@@ -172,20 +200,26 @@ public class GameWorld {
         }
     }
 
-    private void checkOceanSurvival(double deltaTime) {
+    /**
+     * Update every creature's drinking-water bar. Standing in a water source
+     * refills it; when empty on land the creature dehydrates and loses health.
+     * A death from dehydration emits a death event.
+     */
+    private void checkWater(double deltaTime) {
         for (PlayerEntity player : players.values()) {
             if (!player.isAlive()) {
                 continue;
             }
 
-            player.updateOceanSurvival(biomeAt(player.getX(), player.getY()), deltaTime);
+            player.updateWater(isInWaterSource(player.getX(), player.getY()), deltaTime);
+
             if (!player.isAlive()) {
                 long spawnedAt = playerSpawnMs.getOrDefault(player.getId(), System.currentTimeMillis());
                 deathEvents.add(new DeathEvent(
                         player.getId(),
                         null,
                         null,
-                        DeathEvent.REASON_OCEAN_SURVIVAL,
+                        DeathEvent.REASON_DEHYDRATION,
                         player.getX(),
                         player.getY(),
                         0.0,
@@ -194,6 +228,7 @@ public class GameWorld {
             }
         }
     }
+
 
     /**
      * Get the spatial grid (for testing and metrics).
@@ -273,6 +308,9 @@ public class GameWorld {
                 if (distSq <= touchDist * touchDist) {
                     // Collision! Award XP and mark for removal
                     player.addXp(food.getXp());
+                    // Eating also tops up the creature's drinking water.
+                    player.refillWaterOnFood();
+
                     consumedIds.add(food.getInstanceId());
 
                     // Record pickup event for visual feedback
@@ -594,6 +632,43 @@ public class GameWorld {
         }
     }
 
+    /**
+     * Debug helper: instantly level the player up to the next tier so testers
+     * can quickly walk through the evolution chain. Grants enough XP to satisfy
+     * the next evolution option's requirement, then evolves into it. Picks the
+     * first available option for the next tier (matching the player's biome when
+     * possible).
+     */
+    public EvolutionResult debugLevelUp(String playerId) {
+        PlayerEntity player = players.get(playerId);
+        if (player == null || !player.isAlive()) {
+            return EvolutionResult.failure("Player is not alive.");
+        }
+
+        AnimalDefinition current = player.getAnimal();
+        List<AnimalDefinition> options = current.evolutionOptions();
+        if (options.isEmpty()) {
+            // Already at the top of the normal chain; try the final form.
+            AnimalDefinition finalForm = AnimalDefinition.byId("blackdragon");
+            if (finalForm == null || player.getAnimal().biome() == Biome.FINAL) {
+                return EvolutionResult.failure("Already at the maximum tier.");
+            }
+            player.addXp(Math.max(0, finalForm.xpRequired() - player.getXp()));
+            if (!player.canEvolveTo(finalForm)) {
+                return EvolutionResult.failure("Final evolution is not available for this animal.");
+            }
+            return evolvePlayer(playerId, finalForm.id());
+        }
+
+        AnimalDefinition target = options.stream()
+                .filter(a -> a.biome() == current.biome())
+                .findFirst()
+                .orElse(options.get(0));
+
+        player.addXp(Math.max(0, target.xpRequired() - player.getXp()));
+        return evolvePlayer(playerId, target.id());
+    }
+
     public EvolutionResult evolvePlayer(String playerId, String animalId) {
         PlayerEntity player = players.get(playerId);
         if (player == null || !player.isAlive()) {
@@ -647,6 +722,31 @@ public class GameWorld {
         }
         return Biome.LAND;
     }
+
+    /**
+     * Whether the given point is inside a drinking-water source: either the
+     * ocean biome or one of the land/arctic puddles. Aquatic animals refill
+     * their drinking-water bar while inside a water source.
+     */
+    public boolean isInWaterSource(double x, double y) {
+        if (biomeAt(x, y) == Biome.OCEAN) {
+            return true;
+        }
+        for (Puddle puddle : puddles) {
+            double dx = x - puddle.x();
+            double dy = y - puddle.y();
+            if (dx * dx + dy * dy <= puddle.radius() * puddle.radius()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Read-only view of the water puddles for rendering / snapshots. */
+    public List<Puddle> getPuddles() {
+        return puddles;
+    }
+
 
     public SpawnPoint randomSpawnPointForBiome(Biome biome, double radius) {
         Biome targetBiome = biome == Biome.FINAL ? Biome.LAND : biome;
@@ -835,5 +935,12 @@ public class GameWorld {
     }
 
     public record SpawnPoint(double x, double y) {
+    }
+
+    /**
+     * A circular puddle of drinking water on land or arctic terrain. Aquatic
+     * animals refill their water bar while standing inside one.
+     */
+    public record Puddle(double x, double y, double radius) {
     }
 }

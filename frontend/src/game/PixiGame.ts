@@ -423,6 +423,30 @@ export class PixiGame {
     bg.circle(WORLD_WIDTH * 0.62, WORLD_HEIGHT * 0.52, 42);
     bg.fill({ color: 0xa7f3d0, alpha: 0.7 });
 
+    // Drinking-water puddles on land and arctic terrain. Positions and radii
+    // mirror GameWorld.buildPuddles so aquatic animals can refill their water
+    // bar exactly where they see water.
+    const puddles: Array<[number, number, number]> = [
+      // Grassland ponds
+      [WORLD_WIDTH * 0.45, WORLD_HEIGHT * 0.22, 190],
+      [WORLD_WIDTH * 0.72, WORLD_HEIGHT * 0.14, 150],
+      [WORLD_WIDTH * 0.86, WORLD_HEIGHT * 0.46, 210],
+      [WORLD_WIDTH * 0.55, WORLD_HEIGHT * 0.38, 170],
+      [WORLD_WIDTH * 0.38, WORLD_HEIGHT * 0.52, 160],
+      // Arctic ponds (southern band)
+      [WORLD_WIDTH * 0.48, WORLD_HEIGHT * 0.8, 180],
+      [WORLD_WIDTH * 0.8, WORLD_HEIGHT * 0.88, 200],
+      [WORLD_WIDTH * 0.64, WORLD_HEIGHT * 0.72, 170],
+    ];
+
+    for (const [px, py, radius] of puddles) {
+      bg.circle(px, py, radius);
+      bg.fill({ color: 0x38bdf8, alpha: 0.65 });
+      bg.circle(px, py, radius);
+      bg.stroke({ width: 4, color: 0x0ea5e9, alpha: 0.7 });
+    }
+
+
     // Grid lines
     bg.setStrokeStyle({ width: 1, color: 0x1e6b30, alpha: 0.5 });
 
@@ -1128,25 +1152,25 @@ export class PixiGame {
         bar.fill(fillColor);
       }
 
-      const animal = ANIMALS[state.animalId];
-      const maxOceanSurvival = state.maxOceanSurvival ?? 0;
-      const shouldShowOceanSurvival =
-        animal?.biome === 'ocean' && maxOceanSurvival > 0;
-
-      if (shouldShowOceanSurvival) {
-        const survivalPct = Math.max(
+      // Water bar — shown for every creature. Boosting drains it, water
+      // sources and food refill it, and running dry causes dehydration damage.
+      const maxWater = state.maxOceanSurvival ?? 0;
+      if (maxWater > 0) {
+        const waterPct = Math.max(
           0,
-          Math.min(1, (state.oceanSurvival ?? 0) / maxOceanSurvival),
+          Math.min(1, (state.oceanSurvival ?? 0) / maxWater),
         );
-        const oceanBarY = barY + barHeight + 3;
-        const oceanBar = state.oceanSurvivalBar;
+        const waterBarY = barY + barHeight + 3;
+        const waterBar = state.oceanSurvivalBar;
 
-        oceanBar.rect(-barWidth / 2, oceanBarY, barWidth, barHeight);
-        oceanBar.fill({ color: 0x111827, alpha: 0.55 });
+        waterBar.rect(-barWidth / 2, waterBarY, barWidth, barHeight);
+        waterBar.fill({ color: 0x111827, alpha: 0.55 });
 
-        if (survivalPct > 0) {
-          oceanBar.rect(-barWidth / 2, oceanBarY, barWidth * survivalPct, barHeight);
-          oceanBar.fill(0x87cefa);
+        if (waterPct > 0) {
+          // Fade toward red as the water bar empties to warn of dehydration.
+          const waterColor = waterPct > 0.25 ? 0x38bdf8 : 0xef4444;
+          waterBar.rect(-barWidth / 2, waterBarY, barWidth * waterPct, barHeight);
+          waterBar.fill(waterColor);
         }
       }
     }

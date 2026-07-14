@@ -23,6 +23,7 @@ export const ClientMessageType = {
   EVOLVE: 'evolve',
   PING: 'ping',
   GRID_DEBUG: 'grid_debug',
+  DEBUG_LEVEL_UP: 'debug_levelup',
 } as const;
 
 /** Server → Client message types. */
@@ -79,13 +80,19 @@ export interface GridDebugMessage {
   enabled: boolean;
 }
 
+/** Debug-only: instantly evolve the player to the next tier. */
+export interface DebugLevelUpMessage {
+  type: typeof ClientMessageType.DEBUG_LEVEL_UP;
+}
+
 /** Union of all client → server messages. */
 export type ClientMessage =
   | JoinMessage
   | InputMessage
   | EvolveMessage
   | PingMessage
-  | GridDebugMessage;
+  | GridDebugMessage
+  | DebugLevelUpMessage;
 
 // ---------------------------------------------------------------------------
 // Server → Client messages
@@ -262,6 +269,10 @@ export function createPingMessage(): PingMessage {
 
 export function createGridDebugMessage(enabled: boolean): GridDebugMessage {
   return { type: ClientMessageType.GRID_DEBUG, enabled };
+}
+
+export function createDebugLevelUpMessage(): DebugLevelUpMessage {
+  return { type: ClientMessageType.DEBUG_LEVEL_UP };
 }
 
 // ---------------------------------------------------------------------------

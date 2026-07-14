@@ -120,7 +120,9 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             case ProtocolConstants.TYPE_EVOLVE -> handleEvolve(clientSession, msg);
             case ProtocolConstants.TYPE_PING   -> handlePing(clientSession, msg);
             case ProtocolConstants.TYPE_GRID_DEBUG -> handleGridDebug(clientSession, msg);
+            case ProtocolConstants.TYPE_DEBUG_LEVEL_UP -> handleDebugLevelUp(clientSession, msg);
             default                            -> handleUnknown(clientSession, msg);
+
         }
     }
 
@@ -208,7 +210,19 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         log.debug("Grid debug {} by session {}", gridDebug.enabled() ? "enabled" : "disabled", session.getId());
     }
 
+    private void handleDebugLevelUp(ClientSession session, InboundMessage msg) {
+        GameWorld.EvolutionResult result = gameRoom.getWorld().debugLevelUp(session.getId());
+        if (!result.success()) {
+            sendError(session, result.error());
+            return;
+        }
+
+        log.info("Debug level-up: session={}, animalId='{}'",
+                session.getId(), result.player().getAnimal().id());
+    }
+
     private void handleUnknown(ClientSession session, InboundMessage msg) {
+
         log.debug("Unknown message type '{}' from session {}", msg.type(), session.getId());
         sendError(session, "Unknown message type: " + msg.type());
     }

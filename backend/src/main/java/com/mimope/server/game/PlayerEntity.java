@@ -1,7 +1,6 @@
 package com.mimope.server.game;
 
 import com.mimope.server.game.data.AnimalDefinition;
-import com.mimope.server.game.data.Biome;
 import com.mimope.server.protocol.inbound.InputMessage;
 
 /**
@@ -25,10 +24,46 @@ public class PlayerEntity {
     // Stats
     private double health;
     private double xp;
-    private double oceanSurvival;
-    private double maxOceanSurvival;
 
-    private static final double OCEAN_SURVIVAL_SECONDS = 10.0;
+    /**
+     * Drinking-water reserve carried by every creature. Boosting drains it,
+     * standing in a water source or eating food refills it, and running dry
+     * disables boosting while slowly draining health (dehydration).
+     * <p>
+     * The wire/protocol field is still named {@code oceanSurvival} for
+     * backwards compatibility; semantically it is now a universal water bar.
+     */
+    private double water;
+    private double maxWater;
+
+    /** Maximum drinking-water capacity. */
+    private static final double MAX_WATER = 100.0;
+
+    /**
+     * Water drained per second at all times while out of a water source
+     * (thirst over time, 2% of the maximum per second — empties in ~50s).
+     */
+    private static final double WATER_DRAIN_PER_SECOND_PASSIVE = MAX_WATER * 0.02;
+
+    /**
+     * Extra water drained per second while boosting (25% of the maximum),
+     * added on top of the passive drain so boosting always drains faster
+     * than simply moving.
+     */
+    private static final double WATER_DRAIN_PER_SECOND_BOOSTING = MAX_WATER * 0.25;
+
+    /** Water refilled per second while standing in a water source. */
+    private static final double WATER_REFILL_PER_SECOND = MAX_WATER * 0.5;
+
+    /** Water restored when eating a food item. */
+    private static final double WATER_RESTORED_PER_FOOD = 15.0;
+
+    /**
+     * Fraction of maximum health drained per second while completely out of
+     * water (dehydration): 5% of max HP per second.
+     */
+    private static final double DEHYDRATION_HP_FRACTION_PER_SECOND = 0.05;
+
 
     // Latest queued input (set by the WebSocket handler, consumed by the tick)
     private volatile InputMessage pendingInput;
@@ -54,7 +89,7 @@ public class PlayerEntity {
         this.angle = 0;
         this.health = animal.maxHealth();
         this.xp = 0;
-        resetOceanSurvival();
+        resetWater();
     }
 
     // ------------------------------------------------------------------ input queue
@@ -98,9 +133,12 @@ public class PlayerEntity {
         double speed = animal.speed();
         double intensity = input.intensity();
 
-        // Boost: 50% speed increase
-        if (input.boost()) {
+        // Boost: 50% speed increase, at the cost of drinking water.
+        // Boosting is only possible while the water bar is above zero and
+        // drains it at 25% of the maximum per second.
+        if (input.boost() && water > 0) {
             speed *= 1.5;
+            consumeBoostWater(deltaTime);
         }
         speed *= speedMultiplier;
 
@@ -116,6 +154,27 @@ public class PlayerEntity {
         double r = animal.radius();
         this.x = Math.max(r, Math.min(worldWidth - r, this.x));
         this.y = Math.max(r, Math.min(worldHeight - r, this.y));
+    }
+
+    /**
+     * Drain the drinking-water bar as the cost of boosting. Removes
+     * {@code 25%} of the maximum per second, scaled by the tick's elapsed
+     * time. Water never drops below zero.
+     *
+     * @param deltaTime seconds elapsed this tick
+     */
+    private void consumeBoostWater(double deltaTime) {
+        if (water <= 0 || deltaTime <= 0) {
+            return;
+        }
+        this.water = Math.max(0, this.water - WATER_DRAIN_PER_SECOND_BOOSTING * deltaTime);
+    }
+
+    /**
+     * Whether the creature currently has enough water to boost.
+     */
+    public boolean canBoost() {
+        return water > 0;
     }
 
     public void setPosition(double x, double y) {
@@ -168,38 +227,58 @@ public class PlayerEntity {
         this.skinId = skinId;
         this.health = animal.maxHealth();
         this.evolutionOptionsSent = false;
-        resetOceanSurvival();
+        resetWater();
     }
 
-    public void updateOceanSurvival(Biome currentBiome, double deltaTime) {
-        if (!usesOceanSurvival()) {
-            resetOceanSurvival();
+    /**
+     * Update the drinking-water bar each tick.
+     * <p>
+     * While inside a water source (the ocean or a puddle) the bar refills at
+     * {@code 50%} of the maximum per second. Otherwise the bar drains over
+     * time (thirst); when it reaches zero the creature dehydrates and loses
+     * {@code 5%} of its maximum health per second. Reaching zero health is
+     * fatal.
+     *
+     * @param inWaterSource {@code true} if the creature is currently in the
+     *                      ocean or standing in a puddle
+     * @param deltaTime     seconds elapsed this tick
+     */
+    public void updateWater(boolean inWaterSource, double deltaTime) {
+        if (deltaTime <= 0) {
             return;
         }
 
-        if (currentBiome == Biome.OCEAN) {
-            this.oceanSurvival = this.maxOceanSurvival;
+        if (inWaterSource) {
+            this.water = Math.min(this.maxWater, this.water + WATER_REFILL_PER_SECOND * deltaTime);
             return;
         }
 
-        this.oceanSurvival = Math.max(0, this.oceanSurvival - deltaTime);
-        if (this.oceanSurvival <= 0) {
-            kill();
+        // Passive thirst: the water bar drains over time whenever the creature
+        // is not standing in a water source.
+        this.water = Math.max(0, this.water - WATER_DRAIN_PER_SECOND_PASSIVE * deltaTime);
+
+        if (this.water <= 0) {
+            // Dehydration: no water left, drain 5% of max health per second.
+            double dehydrationDamage = getMaxHealth() * DEHYDRATION_HP_FRACTION_PER_SECOND * deltaTime;
+            this.health = Math.max(0, this.health - dehydrationDamage);
+            if (this.health <= 0) {
+                kill();
+            }
         }
     }
 
-    private boolean usesOceanSurvival() {
-        return animal.biome() == Biome.OCEAN;
+
+    /**
+     * Restore drinking water when eating a food item. The bar never exceeds
+     * its maximum.
+     */
+    public void refillWaterOnFood() {
+        this.water = Math.min(this.maxWater, this.water + WATER_RESTORED_PER_FOOD);
     }
 
-    private void resetOceanSurvival() {
-        if (usesOceanSurvival()) {
-            this.maxOceanSurvival = OCEAN_SURVIVAL_SECONDS;
-            this.oceanSurvival = this.maxOceanSurvival;
-        } else {
-            this.maxOceanSurvival = 0;
-            this.oceanSurvival = 0;
-        }
+    private void resetWater() {
+        this.maxWater = MAX_WATER;
+        this.water = MAX_WATER;
     }
 
     public boolean canEvolveTo(AnimalDefinition target) {
@@ -299,12 +378,14 @@ public class PlayerEntity {
         return xp;
     }
 
-    public double getOceanSurvival() {
-        return oceanSurvival;
+    /** Current water level. Exposed on the wire as {@code oceanSurvival}. */
+    public double getWater() {
+        return water;
     }
 
-    public double getMaxOceanSurvival() {
-        return maxOceanSurvival;
+    /** Maximum water level. Exposed on the wire as {@code maxOceanSurvival}. */
+    public double getMaxWater() {
+        return maxWater;
     }
 
     public double getRadius() {

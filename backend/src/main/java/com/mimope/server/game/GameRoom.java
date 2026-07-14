@@ -295,8 +295,8 @@ public class GameRoom {
                 p.getHealth(),
                 p.getMaxHealth(),
                 p.getXp(),
-                p.getOceanSurvival(),
-                p.getMaxOceanSurvival(),
+                p.getWater(),
+                p.getMaxWater(),
                 p.getAbilityCooldownRemainingTicks(world.getTick())
         );
     }

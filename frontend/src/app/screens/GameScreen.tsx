@@ -215,6 +215,14 @@ export function GameScreen() {
               {focused ? '✅' : '⏸ paused'}
             </span>
           </div>
+          <button
+            type="button"
+            className="game-debug-panel__levelup"
+            onClick={() => connection.sendDebugLevelUp()}
+            title="Instantly evolve to the next tier"
+          >
+            ⬆️ Instant Level Up
+          </button>
         </details>
       </div>
 

@@ -489,79 +489,114 @@ class GameWorldTest {
     }
 
     @Test
-    void oceanAnimalInOceanKeepsOceanSurvivalFull() {
+    void everyCreatureHasAFullWaterBarOnSpawn() {
+        PlayerEntity player = world.spawnPlayer("p1", "Mouse");
+
+        assertEquals(100.0, player.getWater(), 0.01);
+        assertEquals(100.0, player.getMaxWater(), 0.01);
+    }
+
+    @Test
+    void creatureInOceanKeepsWaterFull() {
         PlayerEntity player = world.spawnPlayer("p1", "Shrimp", "shrimp");
         setPlayerPosition(player, WIDTH * 0.1, HEIGHT * 0.5);
 
         world.tick(3.0);
 
         assertTrue(player.isAlive());
-        assertEquals(10.0, player.getOceanSurvival(), 0.01);
-        assertEquals(10.0, player.getMaxOceanSurvival(), 0.01);
+        assertEquals(100.0, player.getWater(), 0.01);
+        assertEquals(100.0, player.getMaxWater(), 0.01);
     }
 
     @Test
-    void oceanAnimalOutsideOceanDrainsOceanSurvival() {
-        PlayerEntity player = world.spawnPlayer("p1", "Shrimp", "shrimp");
+    void creatureOnLandDrainsWaterOverTime() {
+        PlayerEntity player = world.spawnPlayer("p1", "Mouse");
         setPlayerPosition(player, WIDTH * 0.6, HEIGHT * 0.2);
 
         world.tick(2.5);
 
         assertTrue(player.isAlive());
-        assertEquals(7.5, player.getOceanSurvival(), 0.01);
+        // Passive thirst drains at 2% of 100 (= 2.0) per second: 100 - 2.5 * 2 = 95.
+        assertEquals(95.0, player.getWater(), 0.01);
     }
 
     @Test
-    void oceanAnimalDiesWhenOceanSurvivalReachesZero() {
-        PlayerEntity player = world.spawnPlayer("p1", "Shrimp", "shrimp");
+    void boostingDrainsWaterFasterThanStandingStill() {
+        PlayerEntity player = world.spawnPlayer("p1", "Mouse");
+        setPlayerPosition(player, WIDTH * 0.6, HEIGHT * 0.2);
+        // 1s of boosting: passive 2.0 + boost 25.0 = 27.0 drained -> 73 remaining.
+        world.queueInput("p1", new InputMessage(1, 0.0, 1.0, true, false, 0L));
+
+        world.tick(1.0);
+
+        assertTrue(player.isAlive());
+        assertEquals(73.0, player.getWater(), 0.01);
+    }
+
+    @Test
+    void creatureDehydratesAndDiesWhenWaterRunsOut() {
+        PlayerEntity player = world.spawnPlayer("p1", "Mouse");
         setPlayerPosition(player, WIDTH * 0.6, HEIGHT * 0.2);
 
-        world.tick(10.1);
+        // Empty the 100-point bar (50s at 2.0/sec) then keep draining health
+        // in the same tick. Dehydration removes 5% of max HP per second, so a
+        // long enough tick both empties the bar and drains all health. Doing
+        // it in one tick keeps the death event in the current tick's window.
+        world.tick(120.0);
+
 
         assertFalse(player.isAlive());
-        assertEquals(0.0, player.getOceanSurvival(), 0.01);
+        assertEquals(0.0, player.getWater(), 0.01);
         assertEquals(1, world.getDeathEvents().size());
-        assertEquals(DeathEvent.REASON_OCEAN_SURVIVAL, world.getDeathEvents().get(0).reason());
+        assertEquals(DeathEvent.REASON_DEHYDRATION, world.getDeathEvents().get(0).reason());
     }
 
     @Test
-    void oceanAnimalReturningToOceanRefillsOceanSurvival() {
+    void returningToOceanRefillsWater() {
         PlayerEntity player = world.spawnPlayer("p1", "Shrimp", "shrimp");
         setPlayerPosition(player, WIDTH * 0.6, HEIGHT * 0.2);
 
         world.tick(4.0);
-        assertEquals(6.0, player.getOceanSurvival(), 0.01);
+        assertEquals(92.0, player.getWater(), 0.01);
 
+        // Back in the ocean the bar refills at 50/sec, so one second tops it up.
         setPlayerPosition(player, WIDTH * 0.1, HEIGHT * 0.5);
-        world.tick(0.05);
+        world.tick(1.0);
 
         assertTrue(player.isAlive());
-        assertEquals(10.0, player.getOceanSurvival(), 0.01);
+        assertEquals(100.0, player.getWater(), 0.01);
     }
 
+
     @Test
-    void landAnimalOutsideOceanDoesNotUseOceanSurvivalDeath() {
+    void standingInLandPuddleRefillsWater() {
         PlayerEntity player = world.spawnPlayer("p1", "Mouse");
+        // Start on dry land and drain some water.
         setPlayerPosition(player, WIDTH * 0.6, HEIGHT * 0.2);
+        world.tick(4.0);
+        assertEquals(92.0, player.getWater(), 0.01);
 
-        world.tick(20.0);
+        // A puddle sits at (0.45, 0.22) on land; standing in it refills water.
+        setPlayerPosition(player, WIDTH * 0.45, HEIGHT * 0.22);
+        assertTrue(world.isInWaterSource(player.getX(), player.getY()));
+        world.tick(1.0);
 
         assertTrue(player.isAlive());
-        assertEquals(0.0, player.getMaxOceanSurvival(), 0.01);
-        assertTrue(world.getDeathEvents().isEmpty());
+        // Refill is 50/sec, so one second tops the 92 bar back to 100.
+        assertEquals(100.0, player.getWater(), 0.01);
     }
 
     @Test
-    void blackdragonDoesNotUseOceanSurvivalDeath() {
+    void blackdragonAlsoUsesTheWaterBar() {
         PlayerEntity player = world.spawnPlayer("p1", "Apex");
         player.setAnimal(AnimalDefinition.byId("blackdragon"));
         setPlayerPosition(player, WIDTH * 0.6, HEIGHT * 0.2);
 
-        world.tick(20.0);
+        world.tick(2.5);
 
         assertTrue(player.isAlive());
-        assertEquals(0.0, player.getMaxOceanSurvival(), 0.01);
-        assertTrue(world.getDeathEvents().isEmpty());
+        assertEquals(100.0, player.getMaxWater(), 0.01);
+        assertEquals(95.0, player.getWater(), 0.01);
     }
 
     @Test

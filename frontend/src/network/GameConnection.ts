@@ -18,6 +18,7 @@ import {
   createInputMessage,
   createEvolveMessage,
   createGridDebugMessage,
+  createDebugLevelUpMessage,
   createPingMessage,
   parseServerMessage,
   ServerMessageType,
@@ -136,6 +137,11 @@ export class GameConnection {
   /** Send grid debug toggle message. */
   sendGridDebugToggle(enabled: boolean): void {
     this.send(createGridDebugMessage(enabled));
+  }
+
+  /** Debug-only: request an instant level-up to the next tier. */
+  sendDebugLevelUp(): void {
+    this.send(createDebugLevelUpMessage());
   }
 
   /** Send a ping for latency measurement. */

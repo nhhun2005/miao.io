@@ -103,6 +103,63 @@ class PlayerEntityTest {
     }
 
     @Test
+    void boostDrainsWaterAtTwentyFivePercentPerSecond() {
+        // 1s of boost => drain 25% of the 100-point bar = 25 water.
+        InputMessage input = new InputMessage(1, 0.0, 1.0, true, false, 0L);
+        player.applyMovement(input, 1.0, 5000, 5000);
+
+        assertEquals(75, player.getWater(), 0.0001, "1s boost drains 25% of the water bar");
+    }
+
+    @Test
+    void boostWaterDrainScalesWithDeltaTime() {
+        // 0.5s of boost => drain 12.5 water.
+        InputMessage input = new InputMessage(1, 0.0, 1.0, true, false, 0L);
+        player.applyMovement(input, 0.5, 5000, 5000);
+
+        assertEquals(87.5, player.getWater(), 0.0001, "Boost water drain scales with tick duration");
+    }
+
+    @Test
+    void boostWaterDrainCompoundsOverMultipleTicks() {
+        InputMessage input = new InputMessage(1, 0.0, 1.0, true, false, 0L);
+        // Two 1s ticks: 100 -> 75 -> 50.
+        player.applyMovement(input, 1.0, 5000, 5000);
+        player.applyMovement(input, 1.0, 5000, 5000);
+
+        assertEquals(50, player.getWater(), 0.0001, "Each tick drains the water bar further");
+    }
+
+    @Test
+    void boostDoesNotDrainXp() {
+        player.addXp(1000);
+        InputMessage input = new InputMessage(1, 0.0, 1.0, true, false, 0L);
+        player.applyMovement(input, 1.0, 5000, 5000);
+
+        assertEquals(1000, player.getXp(), 0.0001, "Boost costs water, not XP");
+    }
+
+    @Test
+    void noBoostDoesNotDrainWater() {
+        InputMessage input = new InputMessage(1, 0.0, 1.0, false, false, 0L);
+        player.applyMovement(input, 1.0, 5000, 5000);
+
+        assertEquals(100, player.getWater(), 0.0001, "Water is untouched by movement when not boosting");
+    }
+
+    @Test
+    void boostWaterDrainNeverGoesBelowZero() {
+        InputMessage input = new InputMessage(1, 0.0, 1.0, true, false, 0L);
+        // Ten 1s ticks would drain 250 water from a 100-point bar; it clamps at 0.
+        for (int i = 0; i < 10; i++) {
+            player.applyMovement(input, 1.0, 5000, 5000);
+        }
+
+        assertEquals(0, player.getWater(), 0.0001, "Water never drops below zero");
+    }
+
+
+    @Test
     void applyMovementWithIntensity() {
         // Half intensity: speed * 0.5 = 100
         InputMessage input = new InputMessage(1, 0.0, 0.5, false, false, 0L);

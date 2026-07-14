@@ -15,4 +15,6 @@ public record DeathEvent(
 ) {
     public static final String REASON_EATEN = "eaten";
     public static final String REASON_OCEAN_SURVIVAL = "Your ocean animal dried out on land.";
+    public static final String REASON_DEHYDRATION = "You ran out of water and dehydrated.";
+
 }
