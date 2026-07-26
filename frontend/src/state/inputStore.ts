@@ -3,7 +3,7 @@
  *
  * The InputManager (owned by PixiGame) pushes updates into this store
  * at a throttled rate so that React HUD components can display the
- * current angle, boost status, ability cooldown, etc.
+ * current angle, dash status, etc.
  *
  * This store is READ-ONLY from the React side. Writes come only from
  * InputManager via the `syncFromInput` action.
@@ -16,10 +16,8 @@ export interface InputState {
   angle: number;
   /** Movement intensity 0–1 (distance from center, normalised). */
   intensity: number;
-  /** Whether boost is currently held. */
-  boost: boolean;
-  /** Whether ability was triggered this frame. */
-  ability: boolean;
+  /** Whether the player triggered a dash this frame. */
+  dash: boolean;
   /** Current input sequence number. */
   seq: number;
   /** Whether the window is focused. */
@@ -32,8 +30,7 @@ export interface InputState {
   syncFromInput: (data: {
     angle: number;
     intensity: number;
-    boost: boolean;
-    ability: boolean;
+    dash: boolean;
     seq: number;
     focused: boolean;
     pointerX: number;
@@ -47,8 +44,7 @@ export interface InputState {
 const initialState = {
   angle: 0,
   intensity: 0,
-  boost: false,
-  ability: false,
+  dash: false,
   seq: 0,
   focused: true,
   pointerX: 0,

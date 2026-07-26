@@ -135,7 +135,7 @@ class GameWorldTest {
     @Test
     void queueInputForExistingPlayer() {
         world.spawnPlayer("p1", "Alice");
-        InputMessage input = new InputMessage(1, 0.0, 1.0, false, false, 0L);
+        InputMessage input = new InputMessage(1, 0.0, 1.0, false, 0L);
         world.queueInput("p1", input);
 
         PlayerEntity player = world.getPlayer("p1");
@@ -148,7 +148,7 @@ class GameWorldTest {
     void queueInputForNonexistentPlayerIsIgnored() {
         // Should not throw
         assertDoesNotThrow(() -> world.queueInput("nonexistent",
-                new InputMessage(1, 0.0, 1.0, false, false, 0L)));
+                new InputMessage(1, 0.0, 1.0, false, 0L)));
     }
 
     @Test
@@ -156,7 +156,7 @@ class GameWorldTest {
         PlayerEntity player = world.spawnPlayer("p1", "Alice");
         player.kill();
 
-        world.queueInput("p1", new InputMessage(1, 0.0, 1.0, false, false, 0L));
+        world.queueInput("p1", new InputMessage(1, 0.0, 1.0, false, 0L));
         assertNull(player.consumeInput(), "Dead player should not receive input");
     }
 
@@ -177,7 +177,7 @@ class GameWorldTest {
         double startX = player.getX();
 
         // Queue input to move right
-        InputMessage input = new InputMessage(1, 0.0, 1.0, false, false, 0L);
+        InputMessage input = new InputMessage(1, 0.0, 1.0, false, 0L);
         world.queueInput("p1", input);
 
         world.tick(0.05); // 0.05s at speed 200 = 10 units
@@ -203,7 +203,7 @@ class GameWorldTest {
         double startX = player.getX();
         player.kill();
 
-        world.queueInput("p1", new InputMessage(1, 0.0, 1.0, false, false, 0L));
+        world.queueInput("p1", new InputMessage(1, 0.0, 1.0, false, 0L));
         world.tick(0.05);
 
         assertEquals(startX, player.getX(), 0.01, "Dead player should not move");
@@ -521,16 +521,52 @@ class GameWorldTest {
     }
 
     @Test
-    void boostingDrainsWaterFasterThanStandingStill() {
+    void beachedSeaCreatureDrainsWaterMuchFasterThanALandAnimal() {
+        PlayerEntity shrimp = world.spawnPlayer("p1", "Shrimp", "shrimp");
+        setPlayerPosition(shrimp, WIDTH * 0.6, HEIGHT * 0.2);
+
+        world.tick(2.0);
+
+        assertTrue(shrimp.isAlive());
+        // Beached: 25% of 100 (= 25.0) per second, so 100 - 2 * 25 = 50.
+        assertEquals(50.0, shrimp.getWater(), 0.01);
+    }
+
+    @Test
+    void beachedSeaCreatureRunsDryInFourSeconds() {
+        PlayerEntity shrimp = world.spawnPlayer("p1", "Shrimp", "shrimp");
+        setPlayerPosition(shrimp, WIDTH * 0.6, HEIGHT * 0.2);
+
+        world.tick(3.9);
+        assertTrue(shrimp.getWater() > 0, "still has water just before the four-second mark");
+
+        world.tick(0.2);
+        assertEquals(0.0, shrimp.getWater(), 0.01);
+    }
+
+    @Test
+    void landAnimalIsUnaffectedByTheBeachedDrain() {
+        PlayerEntity mouse = world.spawnPlayer("p1", "Mouse");
+        setPlayerPosition(mouse, WIDTH * 0.6, HEIGHT * 0.2);
+
+        world.tick(2.0);
+
+        // Land animals keep the 2%/s passive thirst: 100 - 2 * 2 = 96.
+        assertEquals(96.0, mouse.getWater(), 0.01);
+    }
+
+    @Test
+    void dashingDrainsFivePercentOfWater() {
         PlayerEntity player = world.spawnPlayer("p1", "Mouse");
         setPlayerPosition(player, WIDTH * 0.6, HEIGHT * 0.2);
-        // 1s of boosting: passive 2.0 + boost 25.0 = 27.0 drained -> 73 remaining.
-        world.queueInput("p1", new InputMessage(1, 0.0, 1.0, true, false, 0L));
+        // A dash costs a flat 5 water; a 0.05s tick's passive thirst is
+        // negligible (0.1), so the bar sits at ~94.9 afterwards.
+        world.queueInput("p1", new InputMessage(1, 0.0, 1.0, true, 0L));
 
-        world.tick(1.0);
+        world.tick(0.05);
 
         assertTrue(player.isAlive());
-        assertEquals(73.0, player.getWater(), 0.01);
+        assertEquals(94.9, player.getWater(), 0.01);
     }
 
     @Test
@@ -556,8 +592,10 @@ class GameWorldTest {
         PlayerEntity player = world.spawnPlayer("p1", "Shrimp", "shrimp");
         setPlayerPosition(player, WIDTH * 0.6, HEIGHT * 0.2);
 
-        world.tick(4.0);
-        assertEquals(92.0, player.getWater(), 0.01);
+        // Beached sea creatures drain at 25%/s, so two seconds on land halves
+        // the bar.
+        world.tick(2.0);
+        assertEquals(50.0, player.getWater(), 0.01);
 
         // Back in the ocean the bar refills at 50/sec, so one second tops it up.
         setPlayerPosition(player, WIDTH * 0.1, HEIGHT * 0.5);
@@ -597,13 +635,6 @@ class GameWorldTest {
         assertTrue(player.isAlive());
         assertEquals(100.0, player.getMaxWater(), 0.01);
         assertEquals(95.0, player.getWater(), 0.01);
-    }
-
-    @Test
-    void winterSkinRollUsesAnimalEligibilityAndThreshold() {
-        assertEquals("shark_winter", world.rollSkinId(AnimalDefinition.byId("shark"), 0.49));
-        assertEquals("shark", world.rollSkinId(AnimalDefinition.byId("shark"), 0.50));
-        assertEquals("chipmunk", world.rollSkinId(AnimalDefinition.byId("chipmunk"), 0.10));
     }
 
     // ------------------------------------------------------------------ predation and abilities
@@ -830,15 +861,74 @@ class GameWorldTest {
     }
 
     @Test
-    void abilityInputCreatesDashEventAndCooldown() {
+    void dashInputCreatesDashEventAndCooldown() {
         PlayerEntity player = world.spawnPlayer("p1", "Alice");
-        world.queueInput("p1", new InputMessage(1, 0.0, 1.0, false, true, 0L));
+        world.queueInput("p1", new InputMessage(1, 0.0, 1.0, true, 0L));
 
         world.tick(0.05);
 
-        assertEquals(1, world.getAbilityEvents().size());
-        assertEquals("dash", world.getAbilityEvents().get(0).abilityId());
-        assertTrue(player.getAbilityCooldownRemainingTicks(world.getTick()) > 0);
+        assertEquals(1, world.getDashEvents().size());
+        assertEquals("p1", world.getDashEvents().get(0).playerId());
+        assertTrue(player.getDashCooldownRemainingTicks(world.getTick()) > 0);
+    }
+
+    @Test
+    void movementContinuesAtAConstantRateOnTicksWithoutAFreshInput() {
+        PlayerEntity player = world.spawnPlayer("p1", "Alice");
+        setPlayerPosition(player, 500, 500);
+        world.queueInput("p1", new InputMessage(1, 0.0, 1.0, false, 0L));
+
+        world.tick(0.05);
+        double firstStep = player.getX() - 500;
+
+        // No new input arrives for the next two ticks — the client's send timer
+        // simply drifted against the tick. The creature must keep travelling the
+        // same distance per tick rather than stalling.
+        world.tick(0.05);
+        double secondStep = player.getX() - 500 - firstStep;
+        world.tick(0.05);
+        double thirdStep = player.getX() - 500 - firstStep - secondStep;
+
+        assertTrue(firstStep > 0, "player should move on the tick carrying the input");
+        assertEquals(firstStep, secondStep, 1e-9);
+        assertEquals(firstStep, thirdStep, 1e-9);
+    }
+
+    @Test
+    void heldOverInputDoesNotRetriggerTheDash() {
+        world.spawnPlayer("p1", "Alice");
+        world.queueInput("p1", new InputMessage(1, 0.0, 1.0, true, 0L));
+
+        world.tick(0.05);
+        assertEquals(1, world.getDashEvents().size());
+
+        // The same input is reused for steering on the following ticks, but dash
+        // is single-fire and must not fire again without a fresh dash packet.
+        world.tick(0.05);
+        assertEquals(0, world.getDashEvents().size());
+    }
+
+    @Test
+    void dashPushesTheCreatureForwardForSeveralTicks() {
+        PlayerEntity player = world.spawnPlayer("p1", "Alice");
+        setPlayerPosition(player, 500, 500);
+
+        world.queueInput("p1", new InputMessage(1, 0.0, 1.0, false, 0L));
+        world.tick(0.05);
+        double normalStep = player.getX() - 500;
+
+        setPlayerPosition(player, 500, 500);
+        world.queueInput("p1", new InputMessage(2, 0.0, 1.0, true, 0L));
+        world.tick(0.05);
+        double dashStep = player.getX() - 500;
+        assertEquals(normalStep * 3.0, dashStep, 1e-9, "dash tick moves at 3x the normal speed");
+
+        // The burst spans several ticks, so the push is still active without a
+        // fresh dash input.
+        double beforeNextTick = player.getX();
+        world.tick(0.05);
+        assertEquals(normalStep * 3.0, player.getX() - beforeNextTick, 1e-9,
+                "dash burst should outlast a single tick");
     }
 
     @SuppressWarnings("unchecked")

@@ -98,13 +98,13 @@ class OutboundMessageSerializationTest {
                 42L,
                 List.of(new SnapshotMessage.PlayerData(
                         "p1", "Alice", 100.0, 200.0, 22.0, 1.5,
-                        "mouse", "mouse", 100.0, 100.0, 0.0, 0.0, 0.0, 0L
+                        "mouse", 100.0, 100.0, 0.0, 0.0, 0.0, 0L
                 )),
                 List.of(new SnapshotMessage.FoodData("f1", "berry", 300.0, 400.0)),
                 List.of(new SnapshotMessage.LeaderboardEntry("Alice", 0.0)),
                 List.of(new SnapshotMessage.FoodPickupData("f1", "berry", 300.0, 400.0, 5, "p1")),
                 List.of(new SnapshotMessage.KillEventData("p2", "p1", "Alice", 100.0, 200.0, 75.0)),
-                List.of(new SnapshotMessage.AbilityEventData("p1", "dash", 100.0, 200.0, 0.0)),
+                List.of(new SnapshotMessage.DashEventData("p1", 100.0, 200.0, 0.0)),
                 null
         );
         Map<String, Object> map = msg.toMap();
@@ -118,7 +118,6 @@ class OutboundMessageSerializationTest {
         assertEquals("Alice", players.get(0).get("nickname"));
         assertEquals(100.0, players.get(0).get("x"));
         assertEquals("mouse", players.get(0).get("animalId"));
-        assertEquals("mouse", players.get(0).get("skinId"));
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> foods = (List<Map<String, Object>>) map.get("foods");
@@ -143,14 +142,14 @@ class OutboundMessageSerializationTest {
         assertEquals("p2", killEvents.get(0).get("victimId"));
 
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> abilityEvents = (List<Map<String, Object>>) map.get("abilityEvents");
-        assertEquals("dash", abilityEvents.get(0).get("abilityId"));
+        List<Map<String, Object>> dashEvents = (List<Map<String, Object>>) map.get("dashEvents");
+        assertEquals("p1", dashEvents.get(0).get("playerId"));
     }
 
     @Test
     void snapshotPlayerDataToMap() {
         SnapshotMessage.PlayerData pd = new SnapshotMessage.PlayerData(
-                "id1", "Bob", 50.0, 75.0, 28.0, 0.5, "rabbit", "rabbit",
+                "id1", "Bob", 50.0, 75.0, 28.0, 0.5, "rabbit",
                 150.0, 150.0, 50.0, 0.0, 0.0, 20L
         );
         Map<String, Object> map = pd.toMap();
@@ -162,12 +161,11 @@ class OutboundMessageSerializationTest {
         assertEquals(28.0, map.get("radius"));
         assertEquals(0.5, map.get("angle"));
         assertEquals("rabbit", map.get("animalId"));
-        assertEquals("rabbit", map.get("skinId"));
         assertEquals(150.0, map.get("health"));
         assertEquals(150.0, map.get("maxHealth"));
         assertEquals(50.0, map.get("xp"));
         assertEquals(0.0, map.get("oceanSurvival"));
         assertEquals(0.0, map.get("maxOceanSurvival"));
-        assertEquals(20L, map.get("abilityCooldownTicks"));
+        assertEquals(20L, map.get("dashCooldownTicks"));
     }
 }

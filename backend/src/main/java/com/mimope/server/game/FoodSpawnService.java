@@ -1,7 +1,6 @@
 package com.mimope.server.game;
 
 import com.mimope.server.game.data.Biome;
-import com.mimope.server.game.data.AiAnimalDefinition;
 import com.mimope.server.game.data.FoodDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,7 +78,6 @@ public class FoodSpawnService {
             }
 
             FoodDefinition chosen = pickWeightedRandom(biomeFoods, totalWeight(biomeFoods));
-            chosen = rollAiFoodVariant(chosen);
             x = Math.max(chosen.radius(), Math.min(worldWidth - chosen.radius(), x));
             y = Math.max(chosen.radius(), Math.min(worldHeight - chosen.radius(), y));
 
@@ -180,19 +178,6 @@ public class FoodSpawnService {
 
     private int totalWeight(List<FoodDefinition> foods) {
         return foods.stream().mapToInt(FoodDefinition::spawnWeight).sum();
-    }
-
-    private FoodDefinition rollAiFoodVariant(FoodDefinition chosen) {
-        for (AiAnimalDefinition aiAnimal : AiAnimalDefinition.all().values()) {
-            if (chosen.id().equals(aiAnimal.variantOf())
-                    && ThreadLocalRandom.current().nextDouble() < aiAnimal.variantRollRate()) {
-                FoodDefinition variant = FoodDefinition.byId(aiAnimal.id());
-                if (variant != null) {
-                    return variant;
-                }
-            }
-        }
-        return chosen;
     }
 
     private Biome biomeAt(double x, double y) {

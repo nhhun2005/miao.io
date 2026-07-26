@@ -103,15 +103,14 @@ class InboundMessageParsingTest {
         @Test
         void parsesFullInput() {
             InboundMessage raw = decode("""
-                    {"type":"input","seq":42,"angle":1.5708,"intensity":0.85,"boost":true,"ability":false,"timestamp":1719000000000}
+                    {"type":"input","seq":42,"angle":1.5708,"intensity":0.85,"dash":true,"timestamp":1719000000000}
                     """);
             InputMessage input = InputMessage.from(raw);
             assertNotNull(input);
             assertEquals(42, input.seq());
             assertEquals(1.5708, input.angle(), 0.0001);
             assertEquals(0.85, input.intensity(), 0.0001);
-            assertTrue(input.boost());
-            assertFalse(input.ability());
+            assertTrue(input.dash());
             assertEquals(1719000000000L, input.timestamp());
         }
 
@@ -125,8 +124,7 @@ class InboundMessageParsingTest {
             assertEquals(1, input.seq());
             assertEquals(0.0, input.angle(), 0.0001);
             assertEquals(1.0, input.intensity(), 0.0001); // default
-            assertFalse(input.boost()); // default
-            assertFalse(input.ability()); // default
+            assertFalse(input.dash()); // default
             assertEquals(0L, input.timestamp()); // default
         }
 

@@ -3,10 +3,8 @@ import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  AI_ANIMALS,
   ANIMALS,
   ANIMAL_TIERS,
-  ANIMAL_VARIANTS,
   STARTER_ANIMAL_IDS,
   getAnimalPreviewPath,
   getEvolutionOptions,
@@ -87,21 +85,10 @@ describe('animal gameplay registry', () => {
     }
   });
 
-  it('points every gameplay, variant, and AI skin path at an existing file', () => {
+  it('points every gameplay skin path at an existing file', () => {
     for (const animal of Object.values(ANIMALS)) {
       expect(assetExists(animal.skinPath), `${animal.id} missing skin`).toBe(true);
-      expect(assetExists(animal.winterSkinPath), `${animal.id} missing winter skin`).toBe(true);
       expect(assetExists(animal.fullSizePath), `${animal.id} missing fullsize preview`).toBe(true);
-    }
-
-    for (const variant of Object.values(ANIMAL_VARIANTS)) {
-      expect(assetExists(variant.skinPath), `${variant.id} missing skin`).toBe(true);
-      expect(assetExists(variant.winterSkinPath), `${variant.id} missing winter skin`).toBe(true);
-      expect(ANIMALS[variant.baseAnimalId], `${variant.id} missing base animal`).toBeTruthy();
-    }
-
-    for (const animal of Object.values(AI_ANIMALS)) {
-      expect(assetExists(animal.skinPath), `${animal.id} missing skin`).toBe(true);
     }
   });
 

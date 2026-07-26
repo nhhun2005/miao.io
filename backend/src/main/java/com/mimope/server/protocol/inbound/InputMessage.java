@@ -14,8 +14,7 @@ import com.mimope.server.websocket.InboundMessage;
  *   "seq": 42,
  *   "angle": 1.5708,
  *   "intensity": 0.85,
- *   "boost": false,
- *   "ability": false,
+ *   "dash": false,
  *   "timestamp": 1719000000000
  * }
  * </pre>
@@ -23,16 +22,14 @@ import com.mimope.server.websocket.InboundMessage;
  * @param seq       monotonically increasing sequence number
  * @param angle     movement angle in radians (0 = right, π/2 = down)
  * @param intensity movement intensity 0–1 (normalised distance from center)
- * @param boost     whether the player is boosting
- * @param ability   whether the player triggered their ability this frame
+ * @param dash      whether the player triggered a dash this frame
  * @param timestamp client-side timestamp in ms (for RTT estimation)
  */
 public record InputMessage(
         int seq,
         double angle,
         double intensity,
-        boolean boost,
-        boolean ability,
+        boolean dash,
         long timestamp
 ) {
 
@@ -54,15 +51,13 @@ public record InputMessage(
         Number timestampNum = raw.getNumber("timestamp");
 
         // Boolean fields: Jackson deserialises them as Boolean objects in the Map
-        Object boostObj = raw.payload().get("boost");
-        Object abilityObj = raw.payload().get("ability");
+        Object dashObj = raw.payload().get("dash");
 
         return new InputMessage(
                 seqNum.intValue(),
                 angleNum.doubleValue(),
                 intensityNum != null ? intensityNum.doubleValue() : 1.0,
-                boostObj instanceof Boolean b ? b : false,
-                abilityObj instanceof Boolean a ? a : false,
+                dashObj instanceof Boolean d ? d : false,
                 timestampNum != null ? timestampNum.longValue() : 0L
         );
     }

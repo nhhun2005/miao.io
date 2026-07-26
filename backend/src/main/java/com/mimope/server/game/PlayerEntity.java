@@ -1,6 +1,7 @@
 package com.mimope.server.game;
 
 import com.mimope.server.game.data.AnimalDefinition;
+import com.mimope.server.game.data.Biome;
 import com.mimope.server.protocol.inbound.InputMessage;
 
 /**
@@ -14,7 +15,6 @@ public class PlayerEntity {
     private final String id;
     private String nickname;
     private AnimalDefinition animal;
-    private String skinId;
 
     // Position & motion
     private double x;
@@ -26,9 +26,9 @@ public class PlayerEntity {
     private double xp;
 
     /**
-     * Drinking-water reserve carried by every creature. Boosting drains it,
-     * standing in a water source or eating food refills it, and running dry
-     * disables boosting while slowly draining health (dehydration).
+     * Drinking-water reserve carried by every creature. Dashing drains it,
+     * standing in a water source or eating food refills it, and running low
+     * disables dashing while running dry slowly drains health (dehydration).
      * <p>
      * The wire/protocol field is still named {@code oceanSurvival} for
      * backwards compatibility; semantically it is now a universal water bar.
@@ -46,11 +46,12 @@ public class PlayerEntity {
     private static final double WATER_DRAIN_PER_SECOND_PASSIVE = MAX_WATER * 0.02;
 
     /**
-     * Extra water drained per second while boosting (25% of the maximum),
-     * added on top of the passive drain so boosting always drains faster
-     * than simply moving.
+     * Water drained per second by an ocean creature stranded out of water
+     * (25% of the maximum per second). A beached sea animal runs dry in four
+     * seconds and then starts taking dehydration damage, so leaving the water
+     * is a short, deliberate gamble rather than a viable way to travel.
      */
-    private static final double WATER_DRAIN_PER_SECOND_BOOSTING = MAX_WATER * 0.25;
+    private static final double WATER_DRAIN_PER_SECOND_BEACHED = MAX_WATER * 0.25;
 
     /** Water refilled per second while standing in a water source. */
     private static final double WATER_REFILL_PER_SECOND = MAX_WATER * 0.5;
@@ -64,9 +65,20 @@ public class PlayerEntity {
      */
     private static final double DEHYDRATION_HP_FRACTION_PER_SECOND = 0.05;
 
-
     // Latest queued input (set by the WebSocket handler, consumed by the tick)
     private volatile InputMessage pendingInput;
+
+    /**
+     * The most recently applied steering input, retained after it is consumed.
+     * <p>
+     * Client input arrives at ~20 Hz on its own timer, unsynchronised with the
+     * server tick, so some ticks receive no packet while others receive two
+     * (the extra one being dropped by the latest-wins queue). Moving only on
+     * ticks that happened to carry a packet made the creature stall and surge,
+     * i.e. a speed that visibly fluctuates. Holding the last steering input and
+     * re-applying it keeps the distance travelled per second constant.
+     */
+    private InputMessage lastMovementInput;
 
     // Lifecycle
     private boolean alive = true;
@@ -74,16 +86,34 @@ public class PlayerEntity {
     // Evolution
     private boolean evolutionOptionsSent = false;
 
-    // Ability: first MVP ability is a short dash.
-    private static final long ABILITY_COOLDOWN_TICKS = 100;
-    private long lastAbilityTick = -ABILITY_COOLDOWN_TICKS;
-    private long guardUntilTick = -1;
+    /**
+     * Dash: a short speed burst triggered by the player. Costs a flat slice of
+     * the water bar per activation and has a 1.5-second cooldown (30 ticks at
+     * the default 20 Hz tick rate). Dashing is blocked while the water bar sits
+     * below {@link #DASH_MIN_WATER}.
+     * <p>
+     * Holding a dash control keeps the request raised on every input frame, so
+     * the cooldown doubles as the auto-repeat interval.
+     */
+    private static final long DASH_COOLDOWN_TICKS = 30;
+    private static final double DASH_WATER_COST = MAX_WATER * 0.05;
+    private static final double DASH_MIN_WATER = MAX_WATER * 0.10;
+    private long lastDashTick = -DASH_COOLDOWN_TICKS;
+
+    /**
+     * How many ticks the dash burst lasts (~0.15s at the default 20 Hz). A
+     * single-tick burst moved the creature by only a few pixels, so the dash
+     * has to stay active for a short window to read as a forward push — but the
+     * window stays short, since the burst length is what sets the dash
+     * distance.
+     */
+    private static final int DASH_DURATION_TICKS = 3;
+    private int dashTicksRemaining = 0;
 
     public PlayerEntity(String id, String nickname, AnimalDefinition animal, double x, double y) {
         this.id = id;
         this.nickname = nickname;
         this.animal = animal;
-        this.skinId = animal.id();
         this.x = x;
         this.y = y;
         this.angle = 0;
@@ -111,12 +141,32 @@ public class PlayerEntity {
         return input;
     }
 
+    /**
+     * Resolve the steering input to simulate on this tick: the freshly queued
+     * input when one arrived, otherwise the last input that was applied.
+     * <p>
+     * Returns {@code null} only before the player has ever sent an input.
+     *
+     * @see #lastMovementInput
+     */
+    public InputMessage resolveMovementInput() {
+        InputMessage fresh = consumeInput();
+        if (fresh == null) {
+            return lastMovementInput;
+        }
+        // Retain steering only: dash is single-fire, so the held-over copy must
+        // not re-trigger it on ticks that arrive without a fresh packet.
+        this.lastMovementInput = new InputMessage(
+                fresh.seq(), fresh.angle(), fresh.intensity(), false, fresh.timestamp());
+        return fresh;
+    }
+
     // ------------------------------------------------------------------ movement
 
     /**
      * Apply one tick of movement based on the given input.
      *
-     * @param input     the player input (angle, intensity, boost)
+     * @param input     the player input (angle, intensity, dash)
      * @param deltaTime seconds elapsed this tick
      * @param worldWidth  world width for clamping
      * @param worldHeight world height for clamping
@@ -133,13 +183,6 @@ public class PlayerEntity {
         double speed = animal.speed();
         double intensity = input.intensity();
 
-        // Boost: 50% speed increase, at the cost of drinking water.
-        // Boosting is only possible while the water bar is above zero and
-        // drains it at 25% of the maximum per second.
-        if (input.boost() && water > 0) {
-            speed *= 1.5;
-            consumeBoostWater(deltaTime);
-        }
         speed *= speedMultiplier;
 
         double moveAngle = input.angle();
@@ -154,27 +197,6 @@ public class PlayerEntity {
         double r = animal.radius();
         this.x = Math.max(r, Math.min(worldWidth - r, this.x));
         this.y = Math.max(r, Math.min(worldHeight - r, this.y));
-    }
-
-    /**
-     * Drain the drinking-water bar as the cost of boosting. Removes
-     * {@code 25%} of the maximum per second, scaled by the tick's elapsed
-     * time. Water never drops below zero.
-     *
-     * @param deltaTime seconds elapsed this tick
-     */
-    private void consumeBoostWater(double deltaTime) {
-        if (water <= 0 || deltaTime <= 0) {
-            return;
-        }
-        this.water = Math.max(0, this.water - WATER_DRAIN_PER_SECOND_BOOSTING * deltaTime);
-    }
-
-    /**
-     * Whether the creature currently has enough water to boost.
-     */
-    public boolean canBoost() {
-        return water > 0;
     }
 
     public void setPosition(double x, double y) {
@@ -197,13 +219,6 @@ public class PlayerEntity {
     }
 
     public void damage(double amount) {
-        damage(amount, -1);
-    }
-
-    public void damage(double amount, long currentTick) {
-        if (currentTick >= 0 && currentTick <= guardUntilTick) {
-            amount *= 0.5;
-        }
         this.health = Math.max(0, this.health - amount);
         if (this.health <= 0) {
             kill();
@@ -219,15 +234,18 @@ public class PlayerEntity {
     }
 
     public void setAnimal(AnimalDefinition animal) {
-        setAnimal(animal, animal.id());
-    }
-
-    public void setAnimal(AnimalDefinition animal, String skinId) {
         this.animal = animal;
-        this.skinId = skinId;
         this.health = animal.maxHealth();
         this.evolutionOptionsSent = false;
         resetWater();
+    }
+
+    /**
+     * Whether this creature is an ocean animal currently out of water. Only
+     * meaningful when the caller has established it is not in a water source.
+     */
+    private boolean isBeached() {
+        return animal.biome() == Biome.OCEAN;
     }
 
     /**
@@ -235,7 +253,9 @@ public class PlayerEntity {
      * <p>
      * While inside a water source (the ocean or a puddle) the bar refills at
      * {@code 50%} of the maximum per second. Otherwise the bar drains over
-     * time (thirst); when it reaches zero the creature dehydrates and loses
+     * time (thirst) — {@code 2%} of the maximum per second for land and arctic
+     * animals, but {@code 25%} per second for an ocean animal beached out of
+     * water. When the bar reaches zero the creature dehydrates and loses
      * {@code 5%} of its maximum health per second. Reaching zero health is
      * fatal.
      *
@@ -253,9 +273,13 @@ public class PlayerEntity {
             return;
         }
 
-        // Passive thirst: the water bar drains over time whenever the creature
-        // is not standing in a water source.
-        this.water = Math.max(0, this.water - WATER_DRAIN_PER_SECOND_PASSIVE * deltaTime);
+        // Thirst: the water bar drains over time whenever the creature is not
+        // standing in a water source. Ocean creatures out of water are beached
+        // and drain more than ten times faster.
+        double drainPerSecond = isBeached()
+                ? WATER_DRAIN_PER_SECOND_BEACHED
+                : WATER_DRAIN_PER_SECOND_PASSIVE;
+        this.water = Math.max(0, this.water - drainPerSecond * deltaTime);
 
         if (this.water <= 0) {
             // Dehydration: no water left, drain 5% of max health per second.
@@ -266,7 +290,6 @@ public class PlayerEntity {
             }
         }
     }
-
 
     /**
      * Restore drinking water when eating a food item. The bar never exceeds
@@ -314,22 +337,44 @@ public class PlayerEntity {
     public void kill() {
         this.alive = false;
         this.pendingInput = null;
+        this.lastMovementInput = null;
+        this.dashTicksRemaining = 0;
     }
 
-    public boolean canUseAbility(long currentTick) {
-        return currentTick - lastAbilityTick >= ABILITY_COOLDOWN_TICKS;
+    // ------------------------------------------------------------------ dash
+
+    /**
+     * Whether the creature can dash this tick: the cooldown must be up and the
+     * water bar must sit at or above the minimum threshold.
+     */
+    public boolean canDash(long currentTick) {
+        return currentTick - lastDashTick >= DASH_COOLDOWN_TICKS && water >= DASH_MIN_WATER;
     }
 
-    public void markAbilityUsed(long currentTick) {
-        this.lastAbilityTick = currentTick;
+    /**
+     * Register a dash: start the cooldown, pay the flat water cost and open the
+     * burst window during which the creature is pushed forward.
+     */
+    public void markDashUsed(long currentTick) {
+        this.lastDashTick = currentTick;
+        this.water = Math.max(0, this.water - DASH_WATER_COST);
+        this.dashTicksRemaining = DASH_DURATION_TICKS;
     }
 
-    public void guardForTicks(long currentTick, long durationTicks) {
-        this.guardUntilTick = Math.max(this.guardUntilTick, currentTick + durationTicks);
+    /** Whether the forward dash burst is still active. */
+    public boolean isDashing() {
+        return dashTicksRemaining > 0;
     }
 
-    public long getAbilityCooldownRemainingTicks(long currentTick) {
-        return Math.max(0, ABILITY_COOLDOWN_TICKS - (currentTick - lastAbilityTick));
+    /** Consume one tick of the active dash burst. */
+    public void advanceDash() {
+        if (dashTicksRemaining > 0) {
+            dashTicksRemaining--;
+        }
+    }
+
+    public long getDashCooldownRemainingTicks(long currentTick) {
+        return Math.max(0, DASH_COOLDOWN_TICKS - (currentTick - lastDashTick));
     }
 
     // ------------------------------------------------------------------ getters
@@ -348,10 +393,6 @@ public class PlayerEntity {
 
     public AnimalDefinition getAnimal() {
         return animal;
-    }
-
-    public String getSkinId() {
-        return skinId;
     }
 
     public double getX() {

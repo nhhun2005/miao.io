@@ -10,13 +10,12 @@ export interface PlayerSnapshot {
   radius: number;
   angle: number;
   animalId: string;
-  skinId?: string;
   health: number;
   maxHealth: number;
   xp: number;
   oceanSurvival?: number;
   maxOceanSurvival?: number;
-  abilityCooldownTicks: number;
+  dashCooldownTicks: number;
 }
 
 /** Minimal food data received in snapshots. */

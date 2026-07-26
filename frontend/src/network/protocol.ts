@@ -58,8 +58,7 @@ export interface InputMessage {
   seq: number;
   angle: number;
   intensity: number;
-  boost: boolean;
-  ability: boolean;
+  dash: boolean;
   timestamp: number;
 }
 
@@ -115,13 +114,12 @@ export interface SnapshotPlayerData {
   radius: number;
   angle: number;
   animalId: string;
-  skinId?: string;
   health: number;
   maxHealth: number;
   xp: number;
   oceanSurvival?: number;
   maxOceanSurvival?: number;
-  abilityCooldownTicks: number;
+  dashCooldownTicks: number;
 }
 
 /** Food data within a snapshot. */
@@ -158,10 +156,9 @@ export interface KillEventData {
   xpAwarded: number;
 }
 
-/** Ability event within a snapshot (for visual effects). */
-export interface AbilityEventData {
+/** Dash event within a snapshot (for visual effects). */
+export interface DashEventData {
   playerId: string;
-  abilityId: string;
   x: number;
   y: number;
   angle: number;
@@ -186,7 +183,7 @@ export interface SnapshotMessage {
   leaderboard: LeaderboardEntry[];
   foodPickups?: FoodPickupData[];
   killEvents?: KillEventData[];
-  abilityEvents?: AbilityEventData[];
+  dashEvents?: DashEventData[];
   gridDebug?: GridCellDebug[];
 }
 
@@ -245,16 +242,14 @@ export function createInputMessage(
   seq: number,
   angle: number,
   intensity: number,
-  boost: boolean,
-  ability: boolean,
+  dash: boolean,
 ): InputMessage {
   return {
     type: ClientMessageType.INPUT,
     seq,
     angle,
     intensity,
-    boost,
-    ability,
+    dash,
     timestamp: Date.now(),
   };
 }
@@ -347,8 +342,8 @@ function parseSnapshot(data: Record<string, unknown>): SnapshotMessage | null {
     killEvents: Array.isArray(data.killEvents)
       ? (data.killEvents as KillEventData[])
       : undefined,
-    abilityEvents: Array.isArray(data.abilityEvents)
-      ? (data.abilityEvents as AbilityEventData[])
+    dashEvents: Array.isArray(data.dashEvents)
+      ? (data.dashEvents as DashEventData[])
       : undefined,
     gridDebug: Array.isArray(data.gridDebug)
       ? (data.gridDebug as GridCellDebug[])

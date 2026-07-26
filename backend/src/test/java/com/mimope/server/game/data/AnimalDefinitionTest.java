@@ -60,7 +60,6 @@ class AnimalDefinitionTest {
         assertNotNull(fox);
         assertEquals("Fox", fox.name());
         assertEquals(6, fox.tier());
-        assertEquals("dash", fox.abilityId());
     }
 
     @Test
@@ -179,19 +178,11 @@ class AnimalDefinitionTest {
     }
 
     @Test
-    void allAnimalsHavePositiveStatsAndKnownAbility() {
-        Set<String> abilityIds = Set.of(
-                "dash", "burrow_dash", "dig_dash", "shell_guard", "ice_slide", "stink_dash",
-                "forage_dash", "ink_dash", "sting_pulse", "back_kick", "charge", "shock_pulse",
-                "claw", "inflate_guard", "roar_pulse", "croc_bite", "wave_pulse",
-                "snowball_dash", "fire_dash", "whirlpool_pulse", "freeze_pulse"
-        );
-
+    void allAnimalsHavePositiveStats() {
         for (AnimalDefinition animal : AnimalDefinition.all().values()) {
             assertTrue(animal.speed() > 0, animal.id() + " speed should be positive");
             assertTrue(animal.radius() > 0, animal.id() + " radius should be positive");
             assertTrue(animal.maxHealth() > 0, animal.id() + " maxHealth should be positive");
-            assertTrue(abilityIds.contains(animal.abilityId()), animal.id() + " has unknown ability");
         }
     }
 

@@ -18,8 +18,7 @@ export function GameScreen() {
   // Input debug state from InputManager → inputStore
   const angle = useInputStore((s) => s.angle);
   const intensity = useInputStore((s) => s.intensity);
-  const boost = useInputStore((s) => s.boost);
-  const ability = useInputStore((s) => s.ability);
+  const dash = useInputStore((s) => s.dash);
   const seq = useInputStore((s) => s.seq);
   const focused = useInputStore((s) => s.focused);
   const localPlayerId = useGameStore((s) => s.localPlayerId);
@@ -70,7 +69,7 @@ export function GameScreen() {
   const healthProgress = localPlayer
     ? Math.max(0, Math.min(1, localPlayer.health / localPlayer.maxHealth))
     : 0;
-  const abilityReady = !localPlayer || localPlayer.abilityCooldownTicks <= 0;
+  const dashReady = !localPlayer || localPlayer.dashCooldownTicks <= 0;
 
   if (!connection) {
     return (
@@ -112,8 +111,8 @@ export function GameScreen() {
             <strong>{Math.floor(localPlayer?.xp ?? 0)}</strong>
           </div>
           <div className="game-hud__ability">
-            <span>{currentAnimal?.abilityName ?? 'Ability'}</span>
-            <strong>{abilityReady ? 'Ready' : `${localPlayer?.abilityCooldownTicks ?? 0}t`}</strong>
+            <span>Dash</span>
+            <strong>{dashReady ? 'Ready' : `${localPlayer?.dashCooldownTicks ?? 0}t`}</strong>
           </div>
         </div>
       </div>
@@ -170,12 +169,8 @@ export function GameScreen() {
                 <strong>Mouse pointer</strong>
               </div>
               <div className="settings-panel__row">
-                <span>Boost</span>
-                <strong>Left click / Space</strong>
-              </div>
-              <div className="settings-panel__row">
                 <span>Dash</span>
-                <strong>Right click / W / Enter</strong>
+                <strong>Left click / Space / W</strong>
               </div>
             </div>
           </div>
@@ -194,15 +189,9 @@ export function GameScreen() {
             <span>{(intensity * 100).toFixed(0)}%</span>
           </div>
           <div className="game-debug-panel__row">
-            <span>Boost:</span>
-            <span className={boost ? 'game-debug-panel__active' : ''}>
-              {boost ? '🔥 ON' : 'OFF'}
-            </span>
-          </div>
-          <div className="game-debug-panel__row">
-            <span>Ability:</span>
-            <span className={ability ? 'game-debug-panel__active' : ''}>
-              {ability ? '⚡ FIRED' : 'ready'}
+            <span>Dash:</span>
+            <span className={dash ? 'game-debug-panel__active' : ''}>
+              {dash ? '⚡ DASH' : 'ready'}
             </span>
           </div>
           <div className="game-debug-panel__row">

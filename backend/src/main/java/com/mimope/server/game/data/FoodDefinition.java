@@ -61,9 +61,6 @@ public record FoodDefinition(
         map.put("snail", new FoodDefinition(
                 "snail", "Snail", 25, 14, 1, Biome.LAND, 8));
 
-        map.put("snail2", new FoodDefinition(
-                "snail2", "Snail", 25, 14, 1, Biome.LAND, 0));
-
         REGISTRY = Collections.unmodifiableMap(map);
     }
 

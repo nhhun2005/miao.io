@@ -30,6 +30,9 @@ Generated during Phase 2: Asset Inventory And Game Data.
 | `watermelonSlice.png` | Watermelon slice | `watermelonSlice_e.png` |
 
 ### Ability Icons
+
+> Không còn dùng trong game. Tính năng skill đã bị gỡ; dash là hành động chung cho mọi sinh vật và không có icon riêng. Các file vẫn còn trong `assets/` nhưng không được nạp.
+
 | File | Description |
 |------|-------------|
 | `ability_backkick.png` | Back kick ability |
@@ -96,7 +99,6 @@ Generated during Phase 2: Asset Inventory And Game Data.
 | `blackdragon.png` | Black Dragon |
 | `cheetah.png` | Cheetah |
 | `crab.png` | Crab |
-| `crab2.png` | Crab (variant) |
 | `croc.png` | Crocodile |
 | `deer.png` | Deer |
 | `donkey.png` | Donkey |
@@ -113,21 +115,17 @@ Generated during Phase 2: Asset Inventory And Game Data.
 | `octopus.png` | Octopus |
 | `pig.png` | Pig |
 | `pufferfish.png` | Pufferfish |
-| `pufferfish2.png` | Pufferfish (variant) |
 | `rabbit.png` | Rabbit |
 | `rhino.png` | Rhino |
 | `seahorse.png` | Seahorse |
 | `shark.png` | Shark |
 | `shrimp.png` | Shrimp |
 | `snail.png` | Snail |
-| `snail2.png` | Snail (variant) |
 | `squid.png` | Squid |
 | `stingray.png` | Stingray |
 | `swordfish.png` | Swordfish |
-| `swordfish2.png` | Swordfish (variant) |
 | `trout.png` | Trout |
 | `turtle.png` | Turtle |
-| `turtle2.png` | Turtle (variant) |
 | `zebra.png` | Zebra |
 
 ---
@@ -142,7 +140,6 @@ Generated during Phase 2: Asset Inventory And Game Data.
 | `lemming.png` | Lemming |
 | `mammoth.png` | Mammoth |
 | `muskox.png` | Musk Ox |
-| `muskox2.png` | Musk Ox (variant) |
 | `penguin.png` | Penguin |
 | `polarbear.png` | Polar Bear |
 | `reindeer.png` | Reindeer |
@@ -152,48 +149,6 @@ Generated during Phase 2: Asset Inventory And Game Data.
 | `wolf.png` | Wolf |
 | `wolverine.png` | Wolverine |
 | `yeti.png` | Yeti |
-
----
-
-## `assets/skins/winter/` — Winter Variant Skins
-
-Winter-themed reskins of standard animals. Contains 33 `.png` files mirroring most of the standard skins directory.
-
-| File | Animal |
-|------|--------|
-| `bear.png` | Bear |
-| `cheetah.png` | Cheetah |
-| `crab.png` | Crab |
-| `crab2.png` | Crab (variant) |
-| `croc.png` | Crocodile |
-| `deer.png` | Deer |
-| `dragon.png` | Dragon |
-| `fox.png` | Fox |
-| `gorilla.png` | Gorilla |
-| `hippo.png` | Hippo |
-| `jellyfish.png` | Jellyfish |
-| `killerwhale.png` | Killer Whale |
-| `kraken.png` | Kraken |
-| `lion.png` | Lion |
-| `mole.png` | Mole |
-| `mouse.png` | Mouse |
-| `octopus.png` | Octopus |
-| `pig.png` | Pig |
-| `pufferfish.png` | Pufferfish |
-| `pufferfish2.png` | Pufferfish (variant) |
-| `rabbit.png` | Rabbit |
-| `rhino.png` | Rhino |
-| `seahorse.png` | Seahorse |
-| `shark.png` | Shark |
-| `shrimp.png` | Shrimp |
-| `squid.png` | Squid |
-| `stingray.png` | Stingray |
-| `swordfish.png` | Swordfish |
-| `swordfish2.png` | Swordfish (variant) |
-| `trout.png` | Trout |
-| `turtle.png` | Turtle |
-| `turtle2.png` | Turtle (variant) |
-| `zebra.png` | Zebra |
 
 ---
 

@@ -186,10 +186,9 @@ public class GameRoom {
                 ))
                 .toList();
 
-        List<SnapshotMessage.AbilityEventData> abilityEvents = world.getAbilityEvents().stream()
-                .map(e -> new SnapshotMessage.AbilityEventData(
+        List<SnapshotMessage.DashEventData> dashEvents = world.getDashEvents().stream()
+                .map(e -> new SnapshotMessage.DashEventData(
                         e.playerId(),
-                        e.abilityId(),
                         e.x(),
                         e.y(),
                         e.angle()
@@ -241,7 +240,7 @@ public class GameRoom {
                     leaderboard,
                     foodPickups,
                     killEvents,
-                    abilityEvents,
+                    dashEvents,
                     gridDebug);
 
             // Measure snapshot size reduction
@@ -291,13 +290,12 @@ public class GameRoom {
                 p.getRadius(),
                 p.getAngle(),
                 p.getAnimal().id(),
-                p.getSkinId(),
                 p.getHealth(),
                 p.getMaxHealth(),
                 p.getXp(),
                 p.getWater(),
                 p.getMaxWater(),
-                p.getAbilityCooldownRemainingTicks(world.getTick())
+                p.getDashCooldownRemainingTicks(world.getTick())
         );
     }
 

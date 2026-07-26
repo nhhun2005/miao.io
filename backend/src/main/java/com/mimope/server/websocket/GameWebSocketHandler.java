@@ -171,8 +171,8 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         // Queue the input for the game loop to process on the next tick
         gameRoom.queueInput(session.getId(), input);
 
-        log.trace("Input from {}: seq={}, angle={}, boost={}",
-                session.getId(), input.seq(), input.angle(), input.boost());
+        log.trace("Input from {}: seq={}, angle={}, dash={}",
+                session.getId(), input.seq(), input.angle(), input.dash());
     }
 
     private void handleEvolve(ClientSession session, InboundMessage msg) {

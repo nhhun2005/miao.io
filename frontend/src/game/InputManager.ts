@@ -4,8 +4,8 @@
  * Responsibilities:
  * - Track mouse/pointer position relative to canvas center
  * - Convert mouse position to movement angle and distance
- * - Track boost input (left-click / spacebar / touch hold)
- * - Track ability input (right-click / W key)
+ * - Track dash input (left-click / spacebar / two-finger touch); a tap dashes
+ *   once, holding the control re-dashes on every cooldown
  * - Assign monotonically increasing sequence numbers to input frames
  * - Throttle input sending rate (configurable, default 20 Hz)
  * - Handle window blur/focus to prevent stuck inputs
@@ -26,12 +26,13 @@ export interface InputSnapshot {
   seq: number;
   /** Movement angle in radians (0 = right, PI/2 = down). */
   angle: number;
-  /** Distance from canvas center to pointer, normalised 0–1. */
+  /** Movement magnitude: 1 while steering, 0 inside the dead zone. */
   intensity: number;
-  /** Whether the player is boosting. */
-  boost: boolean;
-  /** Whether the player activated their ability this frame. */
-  ability: boolean;
+  /**
+   * Whether the player is requesting a dash this frame — set by a fresh tap
+   * and kept set for as long as a dash control is held down.
+   */
+  dash: boolean;
   /** Timestamp when this snapshot was created (ms). */
   timestamp: number;
 }
@@ -58,6 +59,9 @@ const DEFAULT_SEND_RATE = 20;
 /** Minimum pointer distance (px) before we consider it "moving". */
 const DEAD_ZONE = 3;
 
+/** Keyboard codes that trigger a dash. Holding any of them auto-repeats it. */
+const DASH_KEYS = ['Space', 'KeyW', 'Enter'];
+
 // ---------------------------------------------------------------------------
 // InputManager class
 // ---------------------------------------------------------------------------
@@ -77,9 +81,16 @@ export class InputManager {
   private _intensity = 0;
 
   // Action state
-  private _boost = false;
-  private _ability = false;
-  private _abilityTriggered = false; // single-fire flag
+  private _dashTriggered = false; // single-fire flag (one tap = one dash)
+
+  /**
+   * Whether the pointer's dash button is currently held down. While any dash
+   * control is held, every input frame carries {@code dash: true}, so the
+   * server re-fires the dash the moment its cooldown expires instead of
+   * waiting for another click. Held dash keys are tracked separately in
+   * {@link keysDown}.
+   */
+  private _dashHeldPointer = false;
 
   // Keyboard tracking for stuck-key prevention
   private keysDown = new Set<string>();
@@ -145,6 +156,11 @@ export class InputManager {
     el.addEventListener('pointerdown', this.handlePointerDown);
     el.addEventListener('pointerup', this.handlePointerUp);
 
+    // Releasing outside the canvas must still clear the held-dash state,
+    // otherwise the creature would keep auto-dashing after the button is up.
+    window.addEventListener('pointerup', this.handlePointerUp);
+    window.addEventListener('pointercancel', this.handlePointerUp);
+
     // Touch events (for mobile abstraction)
     el.addEventListener('touchstart', this.handleTouchStart, { passive: false });
     el.addEventListener('touchmove', this.handleTouchMove, { passive: false });
@@ -154,7 +170,7 @@ export class InputManager {
     window.addEventListener('keydown', this.handleKeyDown);
     window.addEventListener('keyup', this.handleKeyUp);
 
-    // Prevent context menu on right-click (ability key)
+    // Prevent context menu on right-click
     el.addEventListener('contextmenu', this.handleContextMenu);
 
     // Focus management
@@ -177,6 +193,8 @@ export class InputManager {
     el.removeEventListener('pointermove', this.handlePointerMove);
     el.removeEventListener('pointerdown', this.handlePointerDown);
     el.removeEventListener('pointerup', this.handlePointerUp);
+    window.removeEventListener('pointerup', this.handlePointerUp);
+    window.removeEventListener('pointercancel', this.handlePointerUp);
     el.removeEventListener('touchstart', this.handleTouchStart);
     el.removeEventListener('touchmove', this.handleTouchMove);
     el.removeEventListener('touchend', this.handleTouchEnd);
@@ -207,19 +225,14 @@ export class InputManager {
     return this._angle;
   }
 
-  /** Movement intensity (0–1). */
+  /** Movement intensity: 1 while steering, 0 inside the dead zone. */
   get intensity(): number {
     return this._intensity;
   }
 
-  /** Whether boost is currently held. */
-  get boost(): boolean {
-    return this._boost;
-  }
-
-  /** Whether ability was triggered (single-fire, resets after read). */
-  get ability(): boolean {
-    return this._abilityTriggered;
+  /** Whether a dash is being requested — a fresh tap, or a held control. */
+  get dash(): boolean {
+    return this._dashTriggered || this._isDashHeld();
   }
 
   /** Current sequence number. */
@@ -244,13 +257,15 @@ export class InputManager {
       seq: this._seq,
       angle: this._angle,
       intensity: this._intensity,
-      boost: this._boost,
-      ability: this._abilityTriggered,
+      // A held dash control keeps the flag raised on every frame. The server
+      // ignores the request while the dash is on cooldown, so holding simply
+      // re-dashes at the first tick the cooldown allows.
+      dash: this._dashTriggered || this._isDashHeld(),
       timestamp: Date.now(),
     };
 
-    // Reset single-fire ability flag after capturing
-    this._abilityTriggered = false;
+    // Reset single-fire dash flag after capturing
+    this._dashTriggered = false;
 
     return snap;
   }
@@ -273,17 +288,16 @@ export class InputManager {
 
   private _onPointerDown(e: PointerEvent): void {
     if (e.button === 0) {
-      // Left click = boost
-      this._boost = true;
-    } else if (e.button === 2) {
-      // Right click = ability
-      this._abilityTriggered = true;
+      // Left click = dash. Holding the button keeps requesting a dash so it
+      // auto-repeats as soon as the cooldown is up.
+      this._dashTriggered = true;
+      this._dashHeldPointer = true;
     }
   }
 
   private _onPointerUp(e: PointerEvent): void {
     if (e.button === 0) {
-      this._boost = false;
+      this._dashHeldPointer = false;
     }
   }
 
@@ -297,13 +311,12 @@ export class InputManager {
       const touch = e.touches[0];
       this._updatePointerFromClient(touch.clientX, touch.clientY);
     }
-    // Single touch = move, hold is boost concept handled via timing
-    // Two-finger tap = ability (future)
+    // Single touch = move; two-finger tap = dash, and holding two fingers
+    // down auto-repeats it on every cooldown.
     if (e.touches.length >= 2) {
-      this._abilityTriggered = true;
+      this._dashTriggered = true;
+      this._dashHeldPointer = true;
     }
-    // Touch down = boost while held
-    this._boost = true;
   }
 
   private _onTouchMove(e: TouchEvent): void {
@@ -315,8 +328,10 @@ export class InputManager {
   }
 
   private _onTouchEnd(e: TouchEvent): void {
+    if (e.touches.length < 2) {
+      this._dashHeldPointer = false;
+    }
     if (e.touches.length === 0) {
-      this._boost = false;
       // Reset pointer to center when no touches
       this.pointerX = 0;
       this.pointerY = 0;
@@ -335,12 +350,11 @@ export class InputManager {
 
     switch (e.code) {
       case 'Space':
-        this._boost = true;
-        e.preventDefault();
-        break;
       case 'KeyW':
       case 'Enter':
-        this._abilityTriggered = true;
+        // Dash. Like the mouse button, holding the key auto-repeats the dash
+        // each time the cooldown expires.
+        this._dashTriggered = true;
         e.preventDefault();
         break;
     }
@@ -348,12 +362,14 @@ export class InputManager {
 
   private _onKeyUp(e: KeyboardEvent): void {
     this.keysDown.delete(e.code);
+  }
 
-    switch (e.code) {
-      case 'Space':
-        this._boost = false;
-        break;
-    }
+  /** Whether any dash control — pointer button or key — is held down. */
+  private _isDashHeld(): boolean {
+    return (
+      this._dashHeldPointer ||
+      DASH_KEYS.some((code) => this.keysDown.has(code))
+    );
   }
 
   private _onContextMenu(e: Event): void {
@@ -415,9 +431,11 @@ export class InputManager {
 
     this._angle = Math.atan2(dy, dx);
 
-    // Normalise intensity: 0 at center, 1 at half the smaller canvas dimension
-    const maxDist = Math.min(this.canvasWidth, this.canvasHeight) / 2;
-    this._intensity = Math.min(1, dist / Math.max(maxDist, 1));
+    // Fixed movement speed: the pointer only chooses a direction, never a
+    // magnitude. Scaling intensity with the cursor distance made the creature
+    // crawl near the center of the screen and sprint at the edges, which read
+    // as an unstable, fluctuating speed.
+    this._intensity = 1;
   }
 
   /** Cache canvas dimensions. */
@@ -429,8 +447,8 @@ export class InputManager {
 
   /** Reset all input state — called on blur/detach to prevent stuck keys. */
   private _resetAllInputs(): void {
-    this._boost = false;
-    this._abilityTriggered = false;
+    this._dashTriggered = false;
+    this._dashHeldPointer = false;
     this.keysDown.clear();
     // We do NOT reset pointer position or angle — the player should
     // continue in the last direction rather than snapping to center.
@@ -441,9 +459,10 @@ export class InputManager {
     if (this.destroyed) return;
     if (!this._focused) return;
 
-    const now = Date.now();
-    if (now - this.lastSendTime < this.sendIntervalMs * 0.9) return;
-    this.lastSendTime = now;
+    // The interval already paces the sends; an extra early-drop guard here only
+    // ever swallowed whole input frames (including single-fire dash clicks) when
+    // setInterval fired a millisecond early, which showed up as a movement hitch.
+    this.lastSendTime = Date.now();
 
     if (this.onInput) {
       this.onInput(this.snapshot());

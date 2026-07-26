@@ -53,8 +53,11 @@ const BASE_ZOOM = 1.0;
 const MIN_ZOOM = 0.3;
 const MAX_ZOOM = 2.0;
 
-/** Interpolation speed (0–1 per frame, higher = snappier). */
+/** Interpolation speed (0–1 per 60 fps frame, higher = snappier). */
 const INTERP_SPEED = 0.15;
+
+/** Reference frame rate the {@link INTERP_SPEED} factor is expressed against. */
+const INTERP_REFERENCE_FPS = 60;
 
 /**
  * Outline thickness (in texture pixels) for the shape-following border drawn
@@ -124,7 +127,6 @@ interface PlayerRenderState {
   targetAngle: number;
   // Data
   animalId: string;
-  skinId: string;
   radius: number;
   health: number;
   maxHealth: number;
@@ -172,12 +174,6 @@ interface EvolutionEffect {
   radius: number;
 }
 
-interface TimedGraphicEffect {
-  graphic: Graphics;
-  ttl: number;
-  maxTtl: number;
-}
-
 /** Duration of the pickup effect in seconds. */
 const PICKUP_EFFECT_DURATION = 0.8;
 
@@ -223,7 +219,6 @@ export class PixiGame {
   // Food pickup visual effects
   private pickupEffects: FoodPickupEffect[] = [];
   private evolutionEffects: EvolutionEffect[] = [];
-  private timedGraphicEffects: TimedGraphicEffect[] = [];
 
   // Grid debug graphics
   private gridDebugGraphics: Graphics | null = null;
@@ -495,10 +490,6 @@ export class PixiGame {
     bg.rect(WORLD_WIDTH * 0.28, WORLD_HEIGHT * 0.42, WORLD_WIDTH * 0.72, 150);
     bg.fill({ color: 0x38bdf8, alpha: 0.55 });
 
-    // Healing-stone placeholder
-    bg.circle(WORLD_WIDTH * 0.62, WORLD_HEIGHT * 0.52, 42);
-    bg.fill({ color: 0xa7f3d0, alpha: 0.7 });
-
     // Drinking-water puddles on land and arctic terrain. Positions and radii
     // mirror GameWorld.buildPuddles so aquatic animals can refill their water
     // bar exactly where they see water.
@@ -574,8 +565,7 @@ export class PixiGame {
         useInputStore.getState().syncFromInput({
           angle: snapshot.angle,
           intensity: snapshot.intensity,
-          boost: snapshot.boost,
-          ability: snapshot.ability,
+          dash: snapshot.dash,
           seq: snapshot.seq,
           focused: this.inputManager!.focused,
           pointerX: offset.x,
@@ -587,8 +577,7 @@ export class PixiGame {
           snapshot.seq,
           snapshot.angle,
           snapshot.intensity,
-          snapshot.boost,
-          snapshot.ability,
+          snapshot.dash,
         );
       },
     });
@@ -623,15 +612,8 @@ export class PixiGame {
         this.spawnKillEffect(kill.x, kill.y, kill.xpAwarded);
       }
     }
-    if (msg.abilityEvents && msg.abilityEvents.length > 0) {
-      for (const ability of msg.abilityEvents) {
-        if (this.isDashAbility(ability.abilityId)) {
-          this.spawnDashEffect(ability.x, ability.y, ability.angle);
-        } else {
-          this.spawnAbilityPulseEffect(ability.x, ability.y, ability.abilityId);
-        }
-      }
-    }
+    // Dash intentionally has no visual effect — it only pushes the creature
+    // forward; msg.dashEvents is left unrendered.
   }
 
   /**
@@ -689,11 +671,9 @@ export class PixiGame {
       state.oceanSurvival = p.oceanSurvival;
       state.maxOceanSurvival = p.maxOceanSurvival;
 
-      const skinId = p.skinId ?? p.animalId;
-
-      // If the animal or cosmetic skin changed, update the sprite texture
-      if (state.animalId !== p.animalId || state.skinId !== skinId) {
-        this.updatePlayerAnimalSprite(state, p.animalId, skinId, p.radius);
+      // If the animal changed, update the sprite texture
+      if (state.animalId !== p.animalId) {
+        this.updatePlayerAnimalSprite(state, p.animalId, p.radius);
       }
 
       // Update radius if changed
@@ -725,8 +705,7 @@ export class PixiGame {
     playerContainer.label = `player-${p.id}`;
 
     // Animal sprite
-    const skinId = p.skinId ?? p.animalId;
-    const key = animalSkinKey(skinId);
+    const key = animalSkinKey(p.animalId);
     const texture = Assets.get<Texture>(key);
 
     let sprite: Sprite;
@@ -808,7 +787,6 @@ export class PixiGame {
       targetY: p.y,
       targetAngle: p.angle,
       animalId: p.animalId,
-      skinId,
       radius: p.radius,
       health: p.health,
       maxHealth: p.maxHealth,
@@ -821,7 +799,6 @@ export class PixiGame {
   private updatePlayerAnimalSprite(
     state: PlayerRenderState,
     newAnimalId: string,
-    newSkinId: string,
     newRadius: number,
   ): void {
     // Remove old sprite (its outline filter is attached to it, so it is torn
@@ -830,7 +807,7 @@ export class PixiGame {
     state.sprite.destroy();
 
     // Create new sprite
-    const key = animalSkinKey(newSkinId);
+    const key = animalSkinKey(newAnimalId);
     const texture = Assets.get<Texture>(key);
 
     let newSprite: Sprite;
@@ -861,7 +838,6 @@ export class PixiGame {
 
     state.sprite = newSprite;
     state.animalId = newAnimalId;
-    state.skinId = newSkinId;
     state.radius = newRadius;
 
     // Update name label position
@@ -1105,62 +1081,6 @@ export class PixiGame {
     });
   }
 
-  private spawnDashEffect(worldX: number, worldY: number, angle: number): void {
-    const graphic = new Graphics();
-    const tailLength = 90;
-    const endX = -Math.cos(angle) * tailLength;
-    const endY = -Math.sin(angle) * tailLength;
-
-    graphic.position.set(worldX, worldY);
-    graphic.setStrokeStyle({ width: 12, color: 0xfacc15, alpha: 0.65 });
-    graphic.moveTo(0, 0);
-    graphic.lineTo(endX, endY);
-    graphic.stroke();
-    this.layerEffects.addChild(graphic);
-
-    this.timedGraphicEffects.push({ graphic, ttl: 0.35, maxTtl: 0.35 });
-  }
-
-  private spawnAbilityPulseEffect(worldX: number, worldY: number, abilityId: string): void {
-    const graphic = new Graphics();
-    const color = this.abilityColor(abilityId);
-    graphic.position.set(worldX, worldY);
-    graphic.circle(0, 0, 70);
-    graphic.stroke({ width: 8, color, alpha: 0.72 });
-    this.layerEffects.addChild(graphic);
-
-    this.timedGraphicEffects.push({ graphic, ttl: 0.45, maxTtl: 0.45 });
-  }
-
-  private isDashAbility(abilityId: string): boolean {
-    return abilityId === 'dash' || abilityId.includes('dash') || abilityId === 'charge';
-  }
-
-  private abilityColor(abilityId: string): number {
-    if (abilityId.includes('fire')) return 0xf97316;
-    if (abilityId.includes('freeze') || abilityId.includes('snow')) return 0x93c5fd;
-    if (abilityId.includes('ink') || abilityId.includes('whirlpool')) return 0x312e81;
-    if (abilityId.includes('shock')) return 0xfacc15;
-    if (abilityId.includes('guard')) return 0x22c55e;
-    return 0xef4444;
-  }
-
-  private updateTimedGraphicEffects(dt: number): void {
-    for (let i = this.timedGraphicEffects.length - 1; i >= 0; i--) {
-      const effect = this.timedGraphicEffects[i];
-      effect.ttl -= dt;
-
-      if (effect.ttl <= 0) {
-        this.layerEffects.removeChild(effect.graphic);
-        effect.graphic.destroy();
-        this.timedGraphicEffects.splice(i, 1);
-        continue;
-      }
-
-      effect.graphic.alpha = effect.ttl / effect.maxTtl;
-    }
-  }
-
   // -----------------------------------------------------------------------
   // Render loop
   // -----------------------------------------------------------------------
@@ -1171,12 +1091,11 @@ export class PixiGame {
     const dt = ticker.deltaMS / 1000;
 
     this.syncLatestStoreSnapshot();
-    this.interpolatePlayers();
+    this.interpolatePlayers(dt);
     this.updatePlayerAdornments();
     this.updateHealthBars();
     this.updatePickupEffects(dt);
     this.updateEvolutionEffects(dt);
-    this.updateTimedGraphicEffects(dt);
     this.updateCamera();
     this.updateGridDebug();
     this.updateFps(ticker.deltaMS);
@@ -1260,18 +1179,24 @@ export class PixiGame {
   // Interpolation — smoothly move sprites toward server positions
   // -----------------------------------------------------------------------
 
-  private interpolatePlayers(): void {
+  private interpolatePlayers(dt: number): void {
+    // Frame-rate independent smoothing. Applying a flat per-frame factor made
+    // the sprite catch up to the server position faster on a 144 Hz display
+    // than on a 60 Hz one, and wobble whenever frame times varied — which read
+    // as a movement speed that kept changing.
+    const t = 1 - Math.pow(1 - INTERP_SPEED, Math.max(dt, 0) * INTERP_REFERENCE_FPS);
+
     for (const [, state] of this.playerSprites) {
       // Lerp position
-      state.displayX += (state.targetX - state.displayX) * INTERP_SPEED;
-      state.displayY += (state.targetY - state.displayY) * INTERP_SPEED;
+      state.displayX += (state.targetX - state.displayX) * t;
+      state.displayY += (state.targetY - state.displayY) * t;
 
       // Lerp angle (handling wraparound)
       let angleDiff = state.targetAngle - state.displayAngle;
       // Normalize to [-PI, PI]
       while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
       while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
-      state.displayAngle += angleDiff * INTERP_SPEED;
+      state.displayAngle += angleDiff * t;
 
       // Apply to container
       state.container.position.set(state.displayX, state.displayY);
@@ -1357,7 +1282,7 @@ export class PixiGame {
         bar.fill(fillColor);
       }
 
-      // Water bar — shown for every creature. Boosting drains it, water
+      // Water bar — shown for every creature. Dashing drains it, water
       // sources and food refill it, and running dry causes dehydration damage.
       const maxWater = state.maxOceanSurvival ?? 0;
       if (maxWater > 0) {

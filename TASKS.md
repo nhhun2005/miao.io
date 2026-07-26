@@ -125,8 +125,7 @@ Recommended default decisions:
 
 - [x] Track mouse position relative to canvas center.
 - [x] Convert mouse position to movement angle.
-- [x] Track boost input.
-- [x] Track ability input.
+- [x] Track dash input (left-click / Space / W, single-fire).
 - [x] Add input sequence numbers.
 - [x] Throttle input sending rate.
 - [x] Support window blur and focus behavior.
@@ -200,7 +199,7 @@ Recommended default decisions:
 - [x] Implement movement from input angle.
 - [x] Clamp movement to world bounds.
 - [x] Validate max speed server-side.
-- [x] Add boost movement rules.
+- [x] Add dash movement rules (1s cooldown, 5% water cost per dash, blocked below 10% water).
 - [x] Send local player state in snapshots.
 - [x] Render server player state on frontend.
 - [x] Add interpolation between snapshots.
@@ -274,17 +273,20 @@ Recommended default decisions:
 
 ---
 
-## Phase 14: Abilities
+## Phase 14: Dash
 
-- [x] Define ability model.
-- [x] Add cooldown tracking.
-- [x] Add first simple ability, such as dash or claw.
-- [x] Validate ability use server-side.
-- [x] Apply ability effects in game loop.
-- [x] Broadcast ability events.
-- [x] Render ability effect in PixiJS.
+Note: the earlier per-animal ability system was removed. Every creature now
+shares a single dash triggered by left-click (or Space / W).
+
+- [x] Add dash cooldown tracking (1 second).
+- [x] Trigger dash from client input (single-fire).
+- [x] Validate dash server-side (cooldown + water threshold).
+- [x] Apply dash speed burst in game loop.
+- [x] Broadcast dash events.
+- [x] Render dash effect in PixiJS.
 - [x] Show cooldown in HUD.
-- [x] Add tests for cooldown and effect rules.
+- [x] Charge 5% water per dash; block dashing below 10% water.
+- [x] Add tests for cooldown and water rules.
 
 ---
 
@@ -394,7 +396,6 @@ Recommended default decisions:
 
 - [ ] Add accounts.
 - [ ] Add persistent stats.
-- [ ] Add skins and cosmetics.
 - [ ] Add multiple rooms.
 - [ ] Add matchmaking.
 - [ ] Add Redis room registry.
@@ -402,7 +403,6 @@ Recommended default decisions:
 - [ ] Add mobile controls.
 - [ ] Add more animals.
 - [ ] Add more biomes.
-- [ ] Add more abilities.
 - [ ] Add admin tools.
 - [ ] Add moderation tools.
 - [ ] Add replay or spectator mode.

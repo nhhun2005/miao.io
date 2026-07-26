@@ -23,8 +23,7 @@ for (let i = 0; i < clients; i++) {
         seq: Date.now(),
         angle: Math.random() * Math.PI * 2,
         intensity: 1,
-        boost: Math.random() > 0.8,
-        ability: Math.random() > 0.95,
+        dash: Math.random() > 0.9,
         timestamp: Date.now(),
       }));
     }, 50);

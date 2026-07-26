@@ -49,7 +49,7 @@ class PlayerEntityTest {
     void queueAndConsumeInput() {
         assertNull(player.consumeInput(), "No input initially");
 
-        InputMessage input = new InputMessage(1, 0.0, 1.0, false, false, 0L);
+        InputMessage input = new InputMessage(1, 0.0, 1.0, false, 0L);
         player.queueInput(input);
 
         InputMessage consumed = player.consumeInput();
@@ -61,8 +61,8 @@ class PlayerEntityTest {
 
     @Test
     void latestInputWins() {
-        player.queueInput(new InputMessage(1, 0.0, 1.0, false, false, 0L));
-        player.queueInput(new InputMessage(2, 1.0, 0.5, false, false, 0L));
+        player.queueInput(new InputMessage(1, 0.0, 1.0, false, 0L));
+        player.queueInput(new InputMessage(2, 1.0, 0.5, false, 0L));
 
         InputMessage consumed = player.consumeInput();
         assertNotNull(consumed);
@@ -74,7 +74,7 @@ class PlayerEntityTest {
     @Test
     void applyMovementMovesRight() {
         // angle=0 => move right, intensity=1.0, deltaTime=1.0s, speed=200
-        InputMessage input = new InputMessage(1, 0.0, 1.0, false, false, 0L);
+        InputMessage input = new InputMessage(1, 0.0, 1.0, false, 0L);
         player.applyMovement(input, 1.0, 5000, 5000);
 
         assertEquals(700, player.getX(), 0.01, "Should move 200 units right");
@@ -86,7 +86,7 @@ class PlayerEntityTest {
     void applyMovementMovesDown() {
         // angle=π/2 => move down
         double angle = Math.PI / 2;
-        InputMessage input = new InputMessage(1, angle, 1.0, false, false, 0L);
+        InputMessage input = new InputMessage(1, angle, 1.0, false, 0L);
         player.applyMovement(input, 1.0, 5000, 5000);
 
         assertEquals(500, player.getX(), 0.01);
@@ -94,65 +94,64 @@ class PlayerEntityTest {
     }
 
     @Test
-    void applyMovementWithBoost() {
-        // Boost increases speed by 50%: 200 * 1.5 = 300
-        InputMessage input = new InputMessage(1, 0.0, 1.0, true, false, 0L);
+    void applyMovementIgnoresDashFlagForPlainMovement() {
+        // Movement speed is unaffected by the dash flag; the dash burst is
+        // applied by GameWorld via the speed multiplier, not applyMovement.
+        InputMessage input = new InputMessage(1, 0.0, 1.0, true, 0L);
         player.applyMovement(input, 1.0, 5000, 5000);
 
-        assertEquals(800, player.getX(), 0.01, "Boost: 500 + 300 = 800");
+        assertEquals(700, player.getX(), 0.01, "Plain movement: 500 + 200 = 700");
     }
 
     @Test
-    void boostDrainsWaterAtTwentyFivePercentPerSecond() {
-        // 1s of boost => drain 25% of the 100-point bar = 25 water.
-        InputMessage input = new InputMessage(1, 0.0, 1.0, true, false, 0L);
-        player.applyMovement(input, 1.0, 5000, 5000);
+    void dashDrainsFivePercentOfWaterPerActivation() {
+        assertTrue(player.canDash(100));
+        player.markDashUsed(100);
 
-        assertEquals(75, player.getWater(), 0.0001, "1s boost drains 25% of the water bar");
+        assertEquals(95, player.getWater(), 0.0001, "Each dash drains 5% of the water bar");
     }
 
     @Test
-    void boostWaterDrainScalesWithDeltaTime() {
-        // 0.5s of boost => drain 12.5 water.
-        InputMessage input = new InputMessage(1, 0.0, 1.0, true, false, 0L);
-        player.applyMovement(input, 0.5, 5000, 5000);
+    void dashIsOnCooldownForOneAndAHalfSeconds() {
+        player.markDashUsed(100);
 
-        assertEquals(87.5, player.getWater(), 0.0001, "Boost water drain scales with tick duration");
+        assertFalse(player.canDash(129), "Still on cooldown before 30 ticks elapse");
+        assertTrue(player.canDash(130), "Cooldown clears after 30 ticks (1.5s at 20 Hz)");
     }
 
     @Test
-    void boostWaterDrainCompoundsOverMultipleTicks() {
-        InputMessage input = new InputMessage(1, 0.0, 1.0, true, false, 0L);
-        // Two 1s ticks: 100 -> 75 -> 50.
-        player.applyMovement(input, 1.0, 5000, 5000);
-        player.applyMovement(input, 1.0, 5000, 5000);
+    void dashBlockedWhenWaterBelowTenPercent() {
+        // Drain the bar down to just under 10% via repeated dashes on cooldown-free ticks.
+        long t = 0;
+        while (player.getWater() >= 10.0) {
+            player.markDashUsed(t);
+            t += 20;
+        }
 
-        assertEquals(50, player.getWater(), 0.0001, "Each tick drains the water bar further");
+        assertTrue(player.getWater() < 10.0);
+        assertFalse(player.canDash(t), "Cannot dash while water is below 10%");
     }
 
     @Test
-    void boostDoesNotDrainXp() {
+    void dashDoesNotDrainXp() {
         player.addXp(1000);
-        InputMessage input = new InputMessage(1, 0.0, 1.0, true, false, 0L);
-        player.applyMovement(input, 1.0, 5000, 5000);
+        player.markDashUsed(100);
 
-        assertEquals(1000, player.getXp(), 0.0001, "Boost costs water, not XP");
+        assertEquals(1000, player.getXp(), 0.0001, "Dash costs water, not XP");
     }
 
     @Test
-    void noBoostDoesNotDrainWater() {
-        InputMessage input = new InputMessage(1, 0.0, 1.0, false, false, 0L);
+    void plainMovementDoesNotDrainWater() {
+        InputMessage input = new InputMessage(1, 0.0, 1.0, false, 0L);
         player.applyMovement(input, 1.0, 5000, 5000);
 
-        assertEquals(100, player.getWater(), 0.0001, "Water is untouched by movement when not boosting");
+        assertEquals(100, player.getWater(), 0.0001, "Water is untouched by plain movement");
     }
 
     @Test
-    void boostWaterDrainNeverGoesBelowZero() {
-        InputMessage input = new InputMessage(1, 0.0, 1.0, true, false, 0L);
-        // Ten 1s ticks would drain 250 water from a 100-point bar; it clamps at 0.
-        for (int i = 0; i < 10; i++) {
-            player.applyMovement(input, 1.0, 5000, 5000);
+    void dashWaterDrainNeverGoesBelowZero() {
+        for (int i = 0; i < 40; i++) {
+            player.markDashUsed(i * 20L);
         }
 
         assertEquals(0, player.getWater(), 0.0001, "Water never drops below zero");
@@ -162,7 +161,7 @@ class PlayerEntityTest {
     @Test
     void applyMovementWithIntensity() {
         // Half intensity: speed * 0.5 = 100
-        InputMessage input = new InputMessage(1, 0.0, 0.5, false, false, 0L);
+        InputMessage input = new InputMessage(1, 0.0, 0.5, false, 0L);
         player.applyMovement(input, 1.0, 5000, 5000);
 
         assertEquals(600, player.getX(), 0.01, "Half intensity: 500 + 100 = 600");
@@ -171,7 +170,7 @@ class PlayerEntityTest {
     @Test
     void applyMovementClampsToWorldBounds() {
         // Move far right beyond world width (5000)
-        InputMessage input = new InputMessage(1, 0.0, 1.0, false, false, 0L);
+        InputMessage input = new InputMessage(1, 0.0, 1.0, false, 0L);
         // Place player near right edge
         PlayerEntity nearEdge = new PlayerEntity("p2", "Bob", mouse, 4990, 500);
         nearEdge.applyMovement(input, 1.0, 5000, 5000);
@@ -183,7 +182,7 @@ class PlayerEntityTest {
     @Test
     void applyMovementClampsToLeftBound() {
         // Move left (angle=π)
-        InputMessage input = new InputMessage(1, Math.PI, 1.0, false, false, 0L);
+        InputMessage input = new InputMessage(1, Math.PI, 1.0, false, 0L);
         PlayerEntity nearLeft = new PlayerEntity("p3", "Charlie", mouse, 30, 500);
         nearLeft.applyMovement(input, 1.0, 5000, 5000);
 
@@ -194,7 +193,7 @@ class PlayerEntityTest {
     @Test
     void applyMovementWithDeltaTime() {
         // 0.05s tick at speed 200 => 10 units
-        InputMessage input = new InputMessage(1, 0.0, 1.0, false, false, 0L);
+        InputMessage input = new InputMessage(1, 0.0, 1.0, false, 0L);
         player.applyMovement(input, 0.05, 5000, 5000);
 
         assertEquals(510, player.getX(), 0.01, "0.05s * 200 = 10 units");

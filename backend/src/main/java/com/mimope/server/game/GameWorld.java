@@ -51,8 +51,8 @@ public class GameWorld {
     /** Death events emitted during the current tick. */
     private final List<DeathEvent> deathEvents = new ArrayList<>();
 
-    /** Ability events emitted during the current tick. */
-    private final List<AbilityEvent> abilityEvents = new ArrayList<>();
+    /** Dash events emitted during the current tick (for client visual effects). */
+    private final List<DashEvent> dashEvents = new ArrayList<>();
 
     /**
      * Player IDs queued for a forced kill from outside the tick thread
@@ -67,6 +67,7 @@ public class GameWorld {
 
     /** Default visibility radius for snapshot filtering. */
     private static final double DEFAULT_VIEW_RADIUS = 2000.0;
+    /** Speed multiplier applied while a dash burst is active. */
     private static final double DASH_SPEED_MULTIPLIER = 3.0;
     private static final long BITE_COOLDOWN_TICKS = 20;
     private static final double BITE_ARC_RADIANS = Math.PI * 2.0 / 3.0;
@@ -133,7 +134,7 @@ public class GameWorld {
         foodPickupEvents.clear();
         evolutionOptionsEvents.clear();
         deathEvents.clear();
-        abilityEvents.clear();
+        dashEvents.clear();
 
         // Drain any externally-requested forced kills (test support) so their
         // death events are emitted within this tick's event window.
@@ -143,17 +144,26 @@ public class GameWorld {
         for (PlayerEntity player : players.values()) {
             if (!player.isAlive()) continue;
 
-            InputMessage input = player.consumeInput();
+            // Re-apply the last steering input on ticks that carry no fresh
+            // packet: client input runs on its own ~20 Hz timer and drifts
+            // against the tick, so moving only on packet-carrying ticks made
+            // the creature stall and surge instead of holding a steady speed.
+            InputMessage input = player.resolveMovementInput();
             if (input != null) {
-                double abilityMultiplier = 1.0;
-                if (input.ability() && player.canUseAbility(tick)) {
-                    player.markAbilityUsed(tick);
-                    abilityMultiplier = applyAbility(player, input);
-                    abilityEvents.add(new AbilityEvent(
-                            player.getId(), player.getAnimal().abilityId(), player.getX(), player.getY(), input.angle()));
+                if (input.dash() && player.canDash(tick)) {
+                    player.markDashUsed(tick);
+                    dashEvents.add(new DashEvent(
+                            player.getId(), player.getX(), player.getY(), input.angle()));
                 }
+
+                double dashMultiplier = 1.0;
+                if (player.isDashing()) {
+                    dashMultiplier = DASH_SPEED_MULTIPLIER;
+                    player.advanceDash();
+                }
+
                 double biomeMultiplier = movementMultiplierFor(player.getAnimal(), biomeAt(player.getX(), player.getY()));
-                player.applyMovement(input, deltaTime, width, height, abilityMultiplier * biomeMultiplier);
+                player.applyMovement(input, deltaTime, width, height, dashMultiplier * biomeMultiplier);
             }
         }
 
@@ -507,7 +517,7 @@ public class GameWorld {
         SpawnPoint spawnPoint = randomSpawnPointForBiome(starter.biome(), starter.radius());
 
         PlayerEntity player = new PlayerEntity(playerId, nickname, starter, spawnPoint.x(), spawnPoint.y());
-        player.setAnimal(starter, rollSkinId(starter));
+        player.setAnimal(starter);
         players.put(playerId, player);
         playerSpawnMs.put(playerId, System.currentTimeMillis());
 
@@ -592,8 +602,8 @@ public class GameWorld {
         return Collections.unmodifiableList(deathEvents);
     }
 
-    public List<AbilityEvent> getAbilityEvents() {
-        return Collections.unmodifiableList(abilityEvents);
+    public List<DashEvent> getDashEvents() {
+        return Collections.unmodifiableList(dashEvents);
     }
 
     /**
@@ -692,7 +702,7 @@ public class GameWorld {
             return EvolutionResult.failure("Evolution is not available yet.");
         }
 
-        player.setAnimal(target, rollSkinId(target));
+        player.setAnimal(target);
         if (target.biome() != Biome.FINAL) {
             SpawnPoint spawnPoint = randomSpawnPointForBiome(target.biome(), target.radius());
             player.setPosition(spawnPoint.x(), spawnPoint.y());
@@ -838,99 +848,10 @@ public class GameWorld {
         return Math.max(min, Math.min(max, value));
     }
 
-    private double applyAbility(PlayerEntity player, InputMessage input) {
-        String abilityId = player.getAnimal().abilityId();
-        return switch (abilityId) {
-            case "charge" -> 3.2;
-            case "ice_slide" -> biomeAt(player.getX(), player.getY()) == Biome.ARCTIC ? 3.4 : 2.4;
-            case "burrow_dash", "dig_dash", "stink_dash", "forage_dash", "ink_dash",
-                    "snowball_dash", "fire_dash" -> DASH_SPEED_MULTIPLIER;
-            case "shell_guard", "inflate_guard" -> {
-                player.guardForTicks(tick, 40);
-                yield 0.55;
-            }
-            case "claw", "croc_bite", "back_kick" -> {
-                damagePlayersInArc(player, input.angle(), 150, Math.PI / 2, 90);
-                yield 1.0;
-            }
-            case "shock_pulse", "sting_pulse", "roar_pulse", "wave_pulse",
-                    "whirlpool_pulse", "freeze_pulse" -> {
-                damagePlayersInRadius(player, pulseRadius(abilityId), pulseDamage(abilityId));
-                yield 1.0;
-            }
-            default -> DASH_SPEED_MULTIPLIER;
-        };
-    }
-
-    private void damagePlayersInRadius(PlayerEntity source, double radius, double damage) {
-        for (PlayerEntity target : spatialGrid.queryPlayers(source.getX(), source.getY(), radius)) {
-            if (target == source || !target.isAlive() || !source.getAnimal().canEat(target.getAnimal())) {
-                continue;
-            }
-            double dx = source.getX() - target.getX();
-            double dy = source.getY() - target.getY();
-            double hitDistance = radius + target.getRadius();
-            if (dx * dx + dy * dy <= hitDistance * hitDistance) {
-                target.damage(damage, tick);
-            }
-        }
-    }
-
-    private void damagePlayersInArc(PlayerEntity source,
-                                    double angle,
-                                    double range,
-                                    double arcRadians,
-                                    double damage) {
-        for (PlayerEntity target : spatialGrid.queryPlayers(source.getX(), source.getY(), range)) {
-            if (target == source || !target.isAlive() || !source.getAnimal().canEat(target.getAnimal())) {
-                continue;
-            }
-            double dx = target.getX() - source.getX();
-            double dy = target.getY() - source.getY();
-            double distSq = dx * dx + dy * dy;
-            double hitDistance = range + target.getRadius();
-            if (distSq > hitDistance * hitDistance) {
-                continue;
-            }
-            double targetAngle = Math.atan2(dy, dx);
-            double diff = Math.abs(normalizeAngle(targetAngle - angle));
-            if (diff <= arcRadians / 2) {
-                target.damage(damage, tick);
-            }
-        }
-    }
-
-    private static double pulseRadius(String abilityId) {
-        return switch (abilityId) {
-            case "roar_pulse", "whirlpool_pulse", "freeze_pulse" -> 220;
-            case "wave_pulse" -> 200;
-            default -> 160;
-        };
-    }
-
-    private static double pulseDamage(String abilityId) {
-        return switch (abilityId) {
-            case "roar_pulse", "whirlpool_pulse", "freeze_pulse" -> 110;
-            case "wave_pulse" -> 100;
-            default -> 70;
-        };
-    }
-
     private static double normalizeAngle(double angle) {
         while (angle > Math.PI) angle -= Math.PI * 2;
         while (angle < -Math.PI) angle += Math.PI * 2;
         return angle;
-    }
-
-    private String rollSkinId(AnimalDefinition animal) {
-        return rollSkinId(animal, ThreadLocalRandom.current().nextDouble());
-    }
-
-    String rollSkinId(AnimalDefinition animal, double roll) {
-        if (animal.hasWinterSkin() && roll < 0.5) {
-            return animal.id() + "_winter";
-        }
-        return animal.id();
     }
 
     public record EvolutionOptionsEvent(

@@ -26,7 +26,7 @@ public record SnapshotMessage(
         List<LeaderboardEntry> leaderboard,
         List<FoodPickupData> foodPickups,
         List<KillEventData> killEvents,
-        List<AbilityEventData> abilityEvents,
+        List<DashEventData> dashEvents,
         List<GridCellDebug> gridDebug
 ) {
 
@@ -41,13 +41,12 @@ public record SnapshotMessage(
             double radius,
             double angle,
             String animalId,
-            String skinId,
             double health,
             double maxHealth,
             double xp,
             double oceanSurvival,
             double maxOceanSurvival,
-            long abilityCooldownTicks
+            long dashCooldownTicks
     ) {
         public Map<String, Object> toMap() {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -58,13 +57,12 @@ public record SnapshotMessage(
             m.put("radius", radius);
             m.put("angle", angle);
             m.put("animalId", animalId);
-            m.put("skinId", skinId);
             m.put("health", health);
             m.put("maxHealth", maxHealth);
             m.put("xp", xp);
             m.put("oceanSurvival", oceanSurvival);
             m.put("maxOceanSurvival", maxOceanSurvival);
-            m.put("abilityCooldownTicks", abilityCooldownTicks);
+            m.put("dashCooldownTicks", dashCooldownTicks);
             return m;
         }
     }
@@ -141,10 +139,9 @@ public record SnapshotMessage(
         }
     }
 
-    /** Ability event data included in snapshots for visual effects. */
-    public record AbilityEventData(
+    /** Dash event data included in snapshots for visual effects. */
+    public record DashEventData(
             String playerId,
-            String abilityId,
             double x,
             double y,
             double angle
@@ -152,7 +149,6 @@ public record SnapshotMessage(
         public Map<String, Object> toMap() {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("playerId", playerId);
-            m.put("abilityId", abilityId);
             m.put("x", x);
             m.put("y", y);
             m.put("angle", angle);
@@ -194,8 +190,8 @@ public record SnapshotMessage(
         if (killEvents != null && !killEvents.isEmpty()) {
             map.put("killEvents", killEvents.stream().map(KillEventData::toMap).toList());
         }
-        if (abilityEvents != null && !abilityEvents.isEmpty()) {
-            map.put("abilityEvents", abilityEvents.stream().map(AbilityEventData::toMap).toList());
+        if (dashEvents != null && !dashEvents.isEmpty()) {
+            map.put("dashEvents", dashEvents.stream().map(DashEventData::toMap).toList());
         }
         if (gridDebug != null && !gridDebug.isEmpty()) {
             map.put("gridDebug", gridDebug.stream().map(GridCellDebug::toMap).toList());

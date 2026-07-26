@@ -19,7 +19,7 @@ describe('gameStore', () => {
         health: 100,
         maxHealth: 100,
         xp: 25,
-        abilityCooldownTicks: 0,
+        dashCooldownTicks: 0,
       }],
       [{ id: 'f1', foodId: 'berry', x: 300, y: 400 }],
       [{ nickname: 'Alice', xp: 25 }],

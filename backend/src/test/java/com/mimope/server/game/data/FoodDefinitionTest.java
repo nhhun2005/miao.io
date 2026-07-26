@@ -15,7 +15,7 @@ class FoodDefinitionTest {
     @Test
     void registryContainsAllFirstPlayableFoods() {
         Map<String, FoodDefinition> all = FoodDefinition.all();
-        assertEquals(9, all.size());
+        assertEquals(8, all.size());
         assertNotNull(all.get("berry"));
         assertNotNull(all.get("banana"));
         assertNotNull(all.get("meat"));
@@ -24,7 +24,6 @@ class FoodDefinitionTest {
         assertNotNull(all.get("seaweed"));
         assertNotNull(all.get("arctic_berry"));
         assertNotNull(all.get("snail"));
-        assertNotNull(all.get("snail2"));
     }
 
     @Test
@@ -43,7 +42,7 @@ class FoodDefinitionTest {
     @Test
     void allIdsReturnsCorrectList() {
         List<String> ids = FoodDefinition.allIds();
-        assertEquals(9, ids.size());
+        assertEquals(8, ids.size());
         assertTrue(ids.contains("berry"));
         assertTrue(ids.contains("banana"));
         assertTrue(ids.contains("meat"));
@@ -52,12 +51,11 @@ class FoodDefinitionTest {
         assertTrue(ids.contains("seaweed"));
         assertTrue(ids.contains("arctic_berry"));
         assertTrue(ids.contains("snail"));
-        assertTrue(ids.contains("snail2"));
     }
 
     @Test
     void totalSpawnWeightIsCorrect() {
-        // 50 + 30 + 10 + 20 + 5 + 35 + 35 + 8 + 0 = 193
+        // 50 + 30 + 10 + 20 + 5 + 35 + 35 + 8 = 193
         assertEquals(193, FoodDefinition.totalSpawnWeight());
     }
 

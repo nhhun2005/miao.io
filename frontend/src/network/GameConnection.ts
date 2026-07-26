@@ -125,8 +125,8 @@ export class GameConnection {
   }
 
   /** Send an input message. */
-  sendInput(seq: number, angle: number, intensity: number, boost: boolean, ability: boolean): void {
-    this.send(createInputMessage(seq, angle, intensity, boost, ability));
+  sendInput(seq: number, angle: number, intensity: number, dash: boolean): void {
+    this.send(createInputMessage(seq, angle, intensity, dash));
   }
 
   /** Send an evolve request. */

@@ -60,15 +60,14 @@ describe('createJoinMessage', () => {
 describe('createInputMessage', () => {
   it('creates an input message with all fields', () => {
     const before = Date.now();
-    const msg = createInputMessage(42, 1.5708, 0.85, true, false);
+    const msg = createInputMessage(42, 1.5708, 0.85, true);
     const after = Date.now();
 
     expect(msg.type).toBe('input');
     expect(msg.seq).toBe(42);
     expect(msg.angle).toBeCloseTo(1.5708);
     expect(msg.intensity).toBeCloseTo(0.85);
-    expect(msg.boost).toBe(true);
-    expect(msg.ability).toBe(false);
+    expect(msg.dash).toBe(true);
     expect(msg.timestamp).toBeGreaterThanOrEqual(before);
     expect(msg.timestamp).toBeLessThanOrEqual(after);
   });
@@ -137,19 +136,18 @@ describe('parseServerMessage', () => {
           radius: 22,
           angle: 1.5,
           animalId: 'mouse',
-          skinId: 'mouse',
           health: 100,
           maxHealth: 100,
           xp: 0,
           oceanSurvival: 8.5,
           maxOceanSurvival: 10,
-          abilityCooldownTicks: 0,
+          dashCooldownTicks: 0,
         },
       ],
       foods: [{ id: 'f1', foodId: 'berry', x: 300, y: 400 }],
       leaderboard: [{ nickname: 'Alice', xp: 0 }],
       killEvents: [{ victimId: 'p2', killerId: 'p1', killerNickname: 'Alice', x: 100, y: 200, xpAwarded: 50 }],
-      abilityEvents: [{ playerId: 'p1', abilityId: 'dash', x: 100, y: 200, angle: 0 }],
+      dashEvents: [{ playerId: 'p1', x: 100, y: 200, angle: 0 }],
     });
     const msg = parseServerMessage(json);
     expect(msg).not.toBeNull();
@@ -158,15 +156,15 @@ describe('parseServerMessage', () => {
       expect(msg.tick).toBe(100);
       expect(msg.players).toHaveLength(1);
       expect(msg.players[0].id).toBe('p1');
-      expect(msg.players[0].skinId).toBe('mouse');
+      expect(msg.players[0].animalId).toBe('mouse');
       expect(msg.players[0].oceanSurvival).toBe(8.5);
       expect(msg.players[0].maxOceanSurvival).toBe(10);
       expect(msg.foods).toHaveLength(1);
       expect(msg.foods[0].foodId).toBe('berry');
       expect(msg.leaderboard).toHaveLength(1);
-      expect(msg.players[0].abilityCooldownTicks).toBe(0);
+      expect(msg.players[0].dashCooldownTicks).toBe(0);
       expect(msg.killEvents).toHaveLength(1);
-      expect(msg.abilityEvents).toHaveLength(1);
+      expect(msg.dashEvents).toHaveLength(1);
     }
   });
 

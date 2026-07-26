@@ -15,7 +15,7 @@ The goal is to build a scalable realtime animal survival game with smooth render
 
 ### 1.1 Core Gameplay
 
-Players control an animal in a large 2D world. They collect food, gain XP, evolve into stronger animals, avoid predators, use abilities, and compete for survival.
+Players control an animal in a large 2D world. They collect food, gain XP, evolve into stronger animals, avoid predators, dash to escape or chase, and compete for survival.
 
 ### 1.2 Minimum Playable Version
 
@@ -127,34 +127,38 @@ The frontend should not decide authoritative outcomes such as XP gain, deaths, k
 frontend/src/
 ├── app/
 │   ├── App.tsx
-│   ├── routes.tsx
-│   └── providers.tsx
+│   └── screens/
+│       ├── HomeScreen.tsx
+│       ├── LoadingScreen.tsx
+│       ├── GameScreen.tsx
+│       ├── DeathScreen.tsx
+│       └── index.ts
 ├── ui/
-│   ├── HomeScreen.tsx
-│   ├── GameHud.tsx
-│   ├── Leaderboard.tsx
-│   ├── EvolutionModal.tsx
-│   └── DeathScreen.tsx
+│   ├── Button.tsx
+│   ├── Modal.tsx
+│   ├── Panel.tsx
+│   ├── ErrorBanner.tsx
+│   └── index.ts
 ├── game/
 │   ├── GameCanvas.tsx
 │   ├── PixiGame.ts
-│   ├── camera/
-│   ├── renderer/
-│   ├── entities/
-│   ├── interpolation/
-│   ├── input/
-│   └── assets/
+│   ├── InputManager.ts
+│   └── data/
+│       ├── animals.ts
+│       ├── foods.ts
+│       ├── assets.ts
+│       └── index.ts
 ├── network/
-│   ├── GameSocketClient.ts
-│   ├── protocol.ts
-│   └── messageHandlers.ts
+│   ├── GameConnection.ts
+│   └── protocol.ts
 ├── state/
 │   ├── gameStore.ts
-│   └── uiStore.ts
-└── config/
-    ├── animals.ts
-    ├── assets.ts
-    └── constants.ts
+│   ├── uiStore.ts
+│   └── inputStore.ts
+├── config/
+│   └── env.ts
+├── styles.css
+└── main.tsx
 ```
 
 ### 3.4 React And PixiJS Boundary
@@ -195,7 +199,7 @@ PixiJS should render using stable layers:
 4. Food and resources
 5. Static obstacles
 6. Animals and players
-7. Effects and ability visuals
+7. Effects and dash visuals
 8. Nameplates
 9. Debug overlays
 
@@ -204,8 +208,7 @@ PixiJS should render using stable layers:
 Existing assets include:
 
 - `skins/`: animal sprites
-- `skins/arctic/`: arctic animal variants
-- `skins/winter/`: winter variants
+- `skins/arctic/`: arctic biome animal sprites
 - `skins/fullsize/`: larger animal sprite references
 - `img/`: food, ability icons, UI images, terrain objects
 - `icons/`: legacy directory icons
@@ -241,7 +244,7 @@ Assets should be loaded once at game startup through PixiJS `Assets.load`.
 
 - **Spring Boot:** Application framework.
 - **Spring WebSocket:** Realtime bidirectional gameplay channel.
-- **Java 21 recommended:** Modern runtime and performance.
+- **Java 17 (current baseline):** Matches `backend/pom.xml` and the Docker images; a newer LTS such as Java 21 can be adopted later.
 - **Maven:** Dependency and build management.
 - **Optional Redis later:** Cross-instance state, matchmaking, pub/sub.
 - **Optional PostgreSQL later:** Accounts, stats, persistence.
@@ -260,7 +263,7 @@ The backend should be authoritative for:
 - Collision detection
 - Death and respawn
 - Leaderboard
-- Ability cooldowns and effects
+- Dash cooldown and water cost
 
 The backend sends compact snapshots to clients at a fixed rate.
 
@@ -268,43 +271,54 @@ The backend sends compact snapshots to clients at a fixed rate.
 
 ```text
 backend/src/main/java/com/mimope/server/
-├── config/
-│   ├── WebSocketConfig.java
-│   └── GameProperties.java
+├── MimopeServerApplication.java
+├── HealthController.java
 ├── websocket/
+│   ├── WebSocketConfig.java
 │   ├── GameWebSocketHandler.java
-│   ├── ClientSessionRegistry.java
-│   ├── InboundMessageDecoder.java
-│   └── OutboundMessageEncoder.java
+│   ├── SessionRegistry.java
+│   ├── ClientSession.java
+│   ├── InboundMessage.java
+│   ├── MessageDecoder.java
+│   ├── MessageEncoder.java
+│   └── NicknameValidator.java
 ├── game/
 │   ├── GameLoop.java
 │   ├── GameRoom.java
 │   ├── GameWorld.java
-│   ├── TickScheduler.java
-│   └── SnapshotService.java
-├── world/
-│   ├── WorldConfig.java
-│   ├── Biome.java
-│   ├── SpatialGrid.java
-│   └── CollisionService.java
-├── player/
-│   ├── Player.java
-│   ├── PlayerInput.java
-│   ├── PlayerService.java
-│   └── SpawnService.java
-├── animal/
-│   ├── AnimalType.java
-│   ├── AnimalDefinition.java
-│   ├── AnimalEvolutionService.java
-│   └── AbilityService.java
-├── food/
+│   ├── PlayerEntity.java
 │   ├── FoodEntity.java
-│   ├── FoodDefinition.java
-│   └── FoodSpawnService.java
-└── leaderboard/
-    ├── LeaderboardEntry.java
-    └── LeaderboardService.java
+│   ├── FoodSpawnService.java
+│   ├── SpatialGrid.java
+│   ├── SnapshotMetrics.java
+│   ├── DashEvent.java
+│   ├── DeathEvent.java
+│   ├── FoodPickupEvent.java
+│   └── data/
+│       ├── AnimalDefinition.java
+│       ├── FoodDefinition.java
+│       └── Biome.java
+└── protocol/
+    ├── ProtocolConstants.java
+    ├── inbound/
+    │   ├── JoinMessage.java
+    │   ├── InputMessage.java
+    │   ├── EvolveMessage.java
+    │   ├── PingMessage.java
+    │   └── GridDebugMessage.java
+    └── outbound/
+        ├── WelcomeMessage.java
+        ├── SnapshotMessage.java
+        ├── EvolutionOptionsMessage.java
+        ├── DeathMessage.java
+        ├── PongMessage.java
+        └── ErrorMessage.java
 ```
+
+Note: game simulation, spatial partitioning, leaderboard aggregation, and
+snapshot building currently live inside the `game/` package (`GameWorld`,
+`GameRoom`) rather than in the separate `world/`, `player/`, `animal/`,
+`food/`, and `leaderboard/` packages sketched in earlier drafts.
 
 ### 4.4 Server Game Loop
 
@@ -321,7 +335,7 @@ Tick flow:
 ```text
 read queued inputs
 update player movement
-update abilities
+apply dash
 resolve collisions
 apply food pickup
 apply damage/death
@@ -367,33 +381,42 @@ During development, JSON messages are acceptable. For production, switch to a co
 ```json
 {
   "type": "join",
-  "nickname": "Player"
+  "nickname": "Player",
+  "starterAnimalId": "mouse"
 }
 ```
+
+`starterAnimalId` is optional; when omitted or invalid the server falls back to
+the default starter. Valid starters are `mouse`, `shrimp`, and `chipmunk`.
 
 ```json
 {
   "type": "input",
   "seq": 102,
   "angle": 1.57,
-  "boost": false,
-  "ability": false
+  "intensity": 1.0,
+  "dash": false,
+  "timestamp": 123456789
 }
 ```
 
 ```json
 {
   "type": "evolve",
-  "animal": "rabbit"
+  "animalId": "rabbit"
 }
 ```
 
 ```json
 {
   "type": "ping",
-  "clientTime": 123456789
+  "timestamp": 123456789
 }
 ```
+
+The client also sends `grid_debug` (`{ "enabled": true }`) and, in
+development builds, `debug_levelup` to trigger the spatial-grid overlay and
+an instant evolution respectively.
 
 ### 5.3 Server To Client Messages
 
@@ -401,10 +424,8 @@ During development, JSON messages are acceptable. For production, switch to a co
 {
   "type": "welcome",
   "playerId": "p_123",
-  "world": {
-    "width": 12000,
-    "height": 12000
-  }
+  "nickname": "Player",
+  "protocolVersion": 1
 }
 ```
 
@@ -413,48 +434,75 @@ During development, JSON messages are acceptable. For production, switch to a co
   "type": "snapshot",
   "tick": 5021,
   "players": [],
-  "food": [],
-  "events": []
+  "foods": [],
+  "leaderboard": [],
+  "foodPickups": [],
+  "killEvents": [],
+  "dashEvents": [],
+  "gridDebug": []
 }
 ```
+
+The event arrays (`foodPickups`, `killEvents`, `dashEvents`, `gridDebug`) are
+omitted from the payload when empty.
 
 ```json
 {
   "type": "evolution_options",
-  "options": ["rabbit", "pig"]
+  "options": [
+    { "animalId": "rabbit", "name": "Rabbit", "tier": 2 },
+    { "animalId": "pig", "name": "Pig", "tier": 4 }
+  ]
 }
 ```
 
 ```json
 {
   "type": "death",
-  "reason": "killed_by_player",
-  "killer": "Tiger"
+  "reason": "eaten",
+  "killerNickname": "Tiger",
+  "xpEarned": 450,
+  "survivalTimeMs": 120000
 }
 ```
 
 ```json
 {
   "type": "pong",
-  "clientTime": 123456789,
-  "serverTime": 123456999
+  "timestamp": 123456789
 }
 ```
 
-### 5.4 Snapshot Entity Shape
+### 5.4 Snapshot Entity Shapes
+
+Player entry (`players[]`):
 
 ```json
 {
   "id": "p_123",
-  "kind": "player",
-  "animal": "mouse",
+  "nickname": "Player",
   "x": 2500,
   "y": 4200,
   "radius": 22,
   "angle": 1.2,
-  "nickname": "Player",
+  "animalId": "mouse",
+  "health": 2,
+  "maxHealth": 2,
   "xp": 50,
-  "health": 100
+  "oceanSurvival": 100,
+  "maxOceanSurvival": 100,
+  "dashCooldownTicks": 0
+}
+```
+
+Food entry (`foods[]`):
+
+```json
+{
+  "id": "f_42",
+  "foodId": "berry",
+  "x": 1800,
+  "y": 3200
 }
 ```
 
@@ -469,32 +517,38 @@ Each animal should be data-driven:
 ```json
 {
   "id": "mouse",
+  "name": "Mouse",
   "tier": 1,
-  "biome": "land",
-  "radius": 20,
-  "speed": 220,
-  "maxHealth": 100,
-  "requiredXp": 0,
-  "evolvesTo": ["rabbit", "pig"],
-  "canEat": ["berry"],
-  "predators": ["fox"],
-  "ability": null,
-  "asset": "skins/mouse.png"
+  "biome": "LAND",
+  "radius": 22,
+  "speed": 200,
+  "maxHealth": 2,
+  "xpRequired": 0,
+  "normalEvolution": true
 }
 ```
+
+`maxHealth` is derived from tier (see `AnimalDefinition.maxHealthForTier`).
+Evolution targets are resolved by tier/biome at runtime rather than stored as an
+`evolvesTo` list, and predation is decided server-side by relative size, so
+there are no `evolvesTo`, `canEat`, or `predators` fields on the definition.
 
 ### 6.2 Food Definition
 
 ```json
 {
   "id": "berry",
-  "biome": "land",
-  "radius": 8,
+  "name": "Berry",
+  "biome": "LAND",
+  "radius": 10,
   "xp": 5,
-  "asset": "img/rasp.png",
-  "spawnWeight": 100
+  "minTier": 1,
+  "spawnWeight": 50
 }
 ```
+
+`minTier` is the minimum animal tier required to eat the food. Asset paths live
+in the frontend food registry rather than on the server-side definition.
 
 ### 6.3 Runtime Entities
 
@@ -517,8 +571,8 @@ Core runtime entity fields:
 
 Start with one large rectangular map:
 
-- Width: 12000
-- Height: 12000
+- Width: 5000
+- Height: 5000
 - Spawn-safe central area
 - Land biome first
 - Add water, ocean, arctic, and desert later
