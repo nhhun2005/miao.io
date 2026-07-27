@@ -626,7 +626,8 @@ export class PixiGame {
       // Grassland ponds
       [WORLD_WIDTH * 0.45, WORLD_HEIGHT * 0.22, 190],
       [WORLD_WIDTH * 0.72, WORLD_HEIGHT * 0.14, 150],
-      [WORLD_WIDTH * 0.86, WORLD_HEIGHT * 0.46, 210],
+      // Full circle stays clear of the river band above it.
+      [WORLD_WIDTH * 0.86, WORLD_HEIGHT * 0.5, 210],
       [WORLD_WIDTH * 0.55, WORLD_HEIGHT * 0.38, 170],
       [WORLD_WIDTH * 0.38, WORLD_HEIGHT * 0.52, 160],
       // Arctic ponds (southern band)
@@ -1371,8 +1372,8 @@ export class PixiGame {
       const tail = state.tailHitbox;
       tail.clear();
       if (isHigherTier) {
-        const tailDistance = state.radius * 0.85;
-        const tailRadius = Math.max(6, state.radius * 0.45);
+        const tailDistance = state.radius * 0.92;
+        const tailRadius = Math.max(4, state.radius * 0.18);
         // displayAngle points in the facing direction; the tail is opposite.
         const tx = -Math.cos(state.displayAngle) * tailDistance;
         const ty = -Math.sin(state.displayAngle) * tailDistance;

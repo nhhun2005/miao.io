@@ -34,6 +34,19 @@ class GameWorldTest {
     }
 
     @Test
+    void puddlesDoNotOverlapTheRiver() {
+        double riverTop = HEIGHT * 0.42;
+        double riverBottom = riverTop + 150;
+
+        for (GameWorld.Puddle puddle : world.getPuddles()) {
+            boolean verticallyClear = puddle.y() + puddle.radius() < riverTop
+                    || puddle.y() - puddle.radius() > riverBottom;
+            assertTrue(verticallyClear,
+                    "puddle at (" + puddle.x() + ", " + puddle.y() + ") overlaps the river");
+        }
+    }
+
+    @Test
     void initialTickIsZero() {
         assertEquals(0, world.getTick());
     }
@@ -712,6 +725,40 @@ class GameWorldTest {
     }
 
     @Test
+    void lowerTierCannotBiteHigherTierFromTheSide() {
+        PlayerEntity attacker = world.spawnPlayer("p1", "Mouse");
+        PlayerEntity target = world.spawnPlayer("p2", "Dragon");
+        target.setAnimal(AnimalDefinition.byId("dragon"));
+        setPlayerPosition(attacker, 500, 490);
+        setPlayerPosition(target, 500, 500);
+        attacker.setAngle(Math.PI / 2.0);
+        target.setAngle(0);
+
+        world.tick(0.05);
+
+        assertEquals(target.getMaxHealth(), target.getHealth(),
+                "flank contact must not count as a bite to the tail");
+        assertEquals(0, attacker.getXp());
+    }
+
+    @Test
+    void lowerTierMustStayInsideTheNarrowRearCone() {
+        PlayerEntity attacker = world.spawnPlayer("p1", "Mouse");
+        PlayerEntity target = world.spawnPlayer("p2", "Dragon");
+        target.setAnimal(AnimalDefinition.byId("dragon"));
+        // 20 degrees away from the exact rear, outside the +/-15 degree cone.
+        double offset = Math.toRadians(20);
+        setPlayerPosition(target, 500, 500);
+        setPlayerPosition(attacker, 500 - Math.cos(offset) * 10, 500 + Math.sin(offset) * 10);
+        attacker.setAngle(-offset);
+        target.setAngle(0);
+
+        world.tick(0.05);
+
+        assertEquals(target.getMaxHealth(), target.getHealth());
+    }
+
+    @Test
     void higherTierBitesLowerTierAndStealsXp() {
         PlayerEntity attacker = world.spawnPlayer("p1", "Dragon");
         PlayerEntity target = world.spawnPlayer("p2", "Mouse");
@@ -844,7 +891,7 @@ class GameWorldTest {
     }
 
     @Test
-    void directionalCooldownAllowsTargetToBiteBackIndependently() {
+    void lowerTierCannotTradeBitesFaceToFaceWithHigherTier() {
         PlayerEntity a = world.spawnPlayer("p1", "Alice");
         PlayerEntity b = world.spawnPlayer("p2", "Bob");
         a.setAnimal(AnimalDefinition.byId("fox"));
@@ -856,7 +903,7 @@ class GameWorldTest {
 
         world.tick(0.05);
 
-        assertEquals(6, a.getHealth());
+        assertEquals(7, a.getHealth());
         assertEquals(4, b.getHealth());
     }
 

@@ -71,6 +71,12 @@ public class GameWorld {
     private static final double DASH_SPEED_MULTIPLIER = 3.0;
     private static final long BITE_COOLDOWN_TICKS = 20;
     private static final double BITE_ARC_RADIANS = Math.PI * 2.0 / 3.0;
+    /**
+     * Total angular width of the vulnerable tail zone on a higher-tier animal.
+     * Lower-tier creatures may counter-attack only from this narrow 30-degree
+     * cone, preventing bites from either flank from counting as rear bites.
+     */
+    private static final double REAR_BITE_ARC_RADIANS = Math.PI / 6.0;
 
     /**
      * Knockback distance applied to a bitten creature, expressed as a fraction
@@ -115,7 +121,8 @@ public class GameWorld {
                 // Grassland ponds
                 new Puddle(width * 0.45, height * 0.22, 190),
                 new Puddle(width * 0.72, height * 0.14, 150),
-                new Puddle(width * 0.86, height * 0.46, 210),
+                // Kept south of the river with the full radius clear of it.
+                new Puddle(width * 0.86, height * 0.50, 210),
                 new Puddle(width * 0.55, height * 0.38, 170),
                 new Puddle(width * 0.38, height * 0.52, 160),
                 // Arctic ponds (southern band)
@@ -444,6 +451,10 @@ public class GameWorld {
         if (!isBiteCollision(attacker, target) || !isFacingTarget(attacker, target)) {
             return BiteResult.noHit();
         }
+        if (attacker.getAnimal().tier() < target.getAnimal().tier()
+                && !isInTargetRearBiteZone(attacker, target)) {
+            return BiteResult.noHit();
+        }
         if (!canBiteNow(attacker.getId(), target.getId())) {
             return BiteResult.noHit();
         }
@@ -528,6 +539,23 @@ public class GameWorld {
         double targetAngle = Math.atan2(dy, dx);
         double diff = Math.abs(normalizeAngle(targetAngle - attacker.getAngle()));
         return diff <= BITE_ARC_RADIANS / 2.0;
+    }
+
+    /**
+     * Check the special counter-attack zone behind a higher-tier target. The
+     * angle from the target to the attacker must be almost exactly opposite
+     * the target's facing direction; ordinary side contact is not sufficient.
+     */
+    private boolean isInTargetRearBiteZone(PlayerEntity attacker, PlayerEntity target) {
+        double dx = attacker.getX() - target.getX();
+        double dy = attacker.getY() - target.getY();
+        if (dx == 0 && dy == 0) {
+            return false;
+        }
+        double attackerAngleFromTarget = Math.atan2(dy, dx);
+        double targetRearAngle = target.getAngle() + Math.PI;
+        double diff = Math.abs(normalizeAngle(attackerAngleFromTarget - targetRearAngle));
+        return diff <= REAR_BITE_ARC_RADIANS / 2.0;
     }
 
     private boolean canBiteNow(String attackerId, String targetId) {
