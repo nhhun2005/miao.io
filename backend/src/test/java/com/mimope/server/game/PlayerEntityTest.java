@@ -255,4 +255,64 @@ class PlayerEntityTest {
         assertTrue(str.contains("Alice"));
         assertTrue(str.contains("mouse"));
     }
+
+    // ------------------------------------------------------------------ health regeneration
+
+    @Test
+    void doesNotRegenerateBeforeDelayElapses() {
+        PlayerEntity shark = new PlayerEntity("s1", "Shark", AnimalDefinition.byId("shark"), 0, 0);
+        shark.damageByBite(); // 13 -> 12
+
+        shark.regenerateHealth(4.9); // just under the 5s delay
+        assertEquals(12, shark.getHealth(), "No healing before the 5s no-damage delay elapses");
+    }
+
+    @Test
+    void regeneratesTenPercentEveryTwoSecondsAfterDelay() {
+        PlayerEntity shark = new PlayerEntity("s1", "Shark", AnimalDefinition.byId("shark"), 0, 0);
+        double max = shark.getMaxHealth(); // 13
+        shark.damage(5); // 13 -> 8, leaving room for several heals below the cap
+
+        // Wait out the 5s delay (no heal yet, timer only).
+        shark.regenerateHealth(5.0);
+        assertEquals(8, shark.getHealth(), "Delay itself does not heal");
+
+        // First 2s interval past the delay: +10% of max.
+        shark.regenerateHealth(2.0);
+        assertEquals(8 + max * 0.10, shark.getHealth(), 1e-9);
+
+        // Second 2s interval: another +10% of max.
+        shark.regenerateHealth(2.0);
+        assertEquals(8 + max * 0.20, shark.getHealth(), 1e-9);
+    }
+
+    @Test
+    void regenerationDoesNotExceedMaxHealth() {
+        PlayerEntity shark = new PlayerEntity("s1", "Shark", AnimalDefinition.byId("shark"), 0, 0);
+        shark.damageByBite(); // 13 -> 12
+
+        shark.regenerateHealth(100.0); // way past delay and many intervals
+        assertEquals(shark.getMaxHealth(), shark.getHealth(), "Health is capped at max");
+    }
+
+    @Test
+    void takingDamageResetsRegenerationTimer() {
+        PlayerEntity shark = new PlayerEntity("s1", "Shark", AnimalDefinition.byId("shark"), 0, 0);
+        shark.damageByBite(); // 13 -> 12
+
+        shark.regenerateHealth(4.0); // partway to the delay
+        shark.damageByBite();        // 12 -> 11, resets the timer
+        shark.regenerateHealth(4.9); // under the delay measured from the new damage
+        assertEquals(11, shark.getHealth(), "Fresh damage restarts the 5s delay");
+    }
+
+    @Test
+    void fullHealthCreatureDoesNotRegenerate() {
+        PlayerEntity shark = new PlayerEntity("s1", "Shark", AnimalDefinition.byId("shark"), 0, 0);
+        double max = shark.getMaxHealth();
+
+        shark.regenerateHealth(100.0);
+        assertEquals(max, shark.getHealth(), "Already-full health stays at max");
+    }
+
 }

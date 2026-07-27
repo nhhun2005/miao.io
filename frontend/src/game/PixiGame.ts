@@ -59,29 +59,83 @@ const INTERP_SPEED = 0.15;
 /** Reference frame rate the {@link INTERP_SPEED} factor is expressed against. */
 const INTERP_REFERENCE_FPS = 60;
 
+// ---------------------------------------------------------------------------
+// Outline styling
+// ---------------------------------------------------------------------------
+
+/** What a sprite's shape-following contour means to the local player. */
+type OutlineVariant = 'threat' | 'neutral' | 'edible' | 'inedible';
+
+/** The static look of one contour variant. */
+interface OutlineStyleSpec {
+  /** Ink colour. */
+  color: number;
+  /** Base ink opacity. */
+  alpha: number;
+  /**
+   * Pen width in *world* pixels. OutlineFilter displaces its samples in
+   * physical pixels of the filter texture, so a hard-coded thickness drifts
+   * with both the camera zoom and the display density: a bear drawn 300 px
+   * wide got a hairline while a berry 14 px wide got a fat blob, and every
+   * stroke halved on a retina screen. Storing the weight in world units and
+   * converting it each frame (see {@link PixiGame.updateOutlineStyles}) keeps
+   * one consistent pen across every creature, fruit and zoom level.
+   */
+  pen: number;
+  /**
+   * Sample-count driver, 0–1 for up to 100 angular samples. The sample ring
+   * needs roughly `2π × thickness` steps to come out gap-free, so heavier
+   * pens get more samples; the light food pen stays cheap because hundreds of
+   * food sprites can be on screen at once.
+   */
+  quality: number;
+  /** Opacity swing of the idle pulse (omit for a perfectly steady ink). */
+  pulseDepth?: number;
+  /** Seconds per pulse cycle. */
+  pulsePeriod?: number;
+}
+
 /**
- * Outline thickness (in texture pixels) for the shape-following border drawn
- * around players. The OutlineFilter traces the sprite's opaque pixels, so the
- * ring hugs the exact silhouette without covering or tinting the artwork.
+ * Contour looks, one per meaning. The semantics are unchanged — red marks a
+ * higher-tier predator, green marks food this animal can eat — only the
+ * rendering is gentler: "just so you can see it" ink (neutral creatures,
+ * food that is out of reach) is a translucent slate rather than a hard
+ * pure-black keyline, so the screen no longer reads like a colouring book,
+ * and the two variants that actually demand attention are the only opaque,
+ * slowly breathing ones.
  */
-const PLAYER_OUTLINE_THICKNESS = 3;
-
-/** Outline thickness for the smaller food sprites. */
-const FOOD_OUTLINE_THICKNESS = 2;
+const OUTLINE_STYLES: Record<OutlineVariant, OutlineStyleSpec> = {
+  /** Higher-tier opponent — a threat worth watching. */
+  threat: { color: 0xff5a5a, alpha: 1, pen: 2.6, quality: 0.55, pulseDepth: 0.3, pulsePeriod: 1.15 },
+  /** Same/lower tier opponent or the local player. */
+  neutral: { color: 0x16213a, alpha: 0.55, pen: 1.8, quality: 0.55 },
+  /** Food this player's tier can eat. */
+  edible: {
+    color: 0x2fd46a,
+    alpha: 0.95,
+    pen: 1.6,
+    quality: 0.45,
+    pulseDepth: 0.16,
+    pulsePeriod: 1.8,
+  },
+  /** Food this player's tier cannot eat yet. */
+  inedible: { color: 0x16213a, alpha: 0.5, pen: 1.2, quality: 0.45 },
+};
 
 /**
- * Fixed pixel gap between the sprite edge and its outline. OutlineFilter can
- * offset the outline outward via {@code padding}/{@code offset}; we grow the
- * filter's padding so the ring sits a couple pixels clear of the artwork
- * instead of flush against it.
+ * Screen-space clamp (CSS pixels) for the converted pen width: keeps the ink
+ * readable when the camera zooms out on a huge animal and stops it from
+ * swallowing small sprites when it zooms in.
  */
-const OUTLINE_PADDING = 6;
+const OUTLINE_MIN_SCREEN_PX = 1.1;
+const OUTLINE_MAX_SCREEN_PX = 3;
 
-// Threat / edibility colours for the shape-following outlines.
-const OUTLINE_COLOR_THREAT = 0xff2d2d; // higher-tier opponent (red)
-const OUTLINE_COLOR_NEUTRAL = 0x000000; // same/lower tier or local player (black)
-const OUTLINE_COLOR_EDIBLE = 0x15803d; // food this player can eat (deep green)
-const OUTLINE_COLOR_INEDIBLE = 0x000000; // food this player cannot eat (black)
+/**
+ * Filter padding in CSS pixels: spare room in the filter's render texture so
+ * the widest possible stroke is not clipped. Note this is not a gap between
+ * sprite and ring — OutlineFilter always draws flush against the silhouette.
+ */
+const OUTLINE_PADDING = Math.ceil(OUTLINE_MAX_SCREEN_PX) + 2;
 
 
 
@@ -105,16 +159,13 @@ interface PlayerRenderState {
   nameLabel: Text;
   healthBar: Graphics;
   oceanSurvivalBar: Graphics;
-  /**
-   * Shape-following threat outline drawn directly on the animal sprite via a
-   * filter. It traces the creature's opaque pixels so the coloured ring hugs
-   * the exact silhouette without tinting or covering the artwork.
-   */
-  outline: OutlineFilter;
   /** Green counter-attack hitbox marker drawn at the tail. */
   tailHitbox: Graphics;
-  /** Current outline colour, cached to avoid redundant writes. */
-  outlineColor: number | null;
+  /**
+   * Which shape-following contour the sprite currently wears. Cached so the
+   * shared filter is only re-assigned when the meaning actually changes.
+   */
+  outlineVariant: OutlineVariant;
 
 
   // Current displayed position (interpolated)
@@ -138,20 +189,17 @@ interface PlayerRenderState {
 /** State tracked per rendered food sprite. */
 interface FoodRenderState {
   sprite: Sprite;
-  /**
-   * Shape-following edibility outline drawn directly on the food sprite via a
-   * filter. It traces the food's opaque pixels so the coloured ring hugs the
-   * exact silhouette without tinting or covering the artwork.
-   */
-  outline: OutlineFilter;
   foodId: string;
 
   /** Minimum animal tier required to eat this food. */
   minTier: number;
   /** Base radius of the food sprite. */
   radius: number;
-  /** Current outline colour, cached to avoid redundant writes. */
-  outlineColor: number | null;
+  /**
+   * Which shape-following contour the sprite currently wears. Cached so the
+   * shared filter is only re-assigned when edibility actually changes.
+   */
+  outlineVariant: OutlineVariant;
 }
 
 
@@ -215,6 +263,15 @@ export class PixiGame {
   private playerSprites: Map<string, PlayerRenderState> = new Map();
   private foodSprites: Map<string, FoodRenderState> = new Map();
   private foodSpritePool: Sprite[] = [];
+
+  /**
+   * One shared OutlineFilter per contour variant. Sharing instances means a
+   * newly spawned fruit costs no filter allocation, and re-weighting the ink
+   * every frame is four uniform writes instead of one per visible sprite.
+   */
+  private outlineFilters!: Record<OutlineVariant, OutlineFilter>;
+  /** Seconds accumulated to drive the contour pulse. */
+  private outlinePulseTime = 0;
 
   // Food pickup visual effects
   private pickupEffects: FoodPickupEffect[] = [];
@@ -289,6 +346,10 @@ export class PixiGame {
     // Create rendering layers
     this.createLayers();
 
+    // Build the shared threat / edibility contours (needs the renderer's
+    // resolution, so it has to run after app.init()).
+    this.createOutlineStyles();
+
     // Load assets
     await this.loadAssets();
 
@@ -334,6 +395,19 @@ export class PixiGame {
     this.playerSprites.clear();
     this.foodSprites.clear();
     this.foodSpritePool = [];
+
+    // The contour filters are shared, so no sprite teardown released them.
+    // Drop them explicitly, otherwise every game session leaks four shaders.
+    if (this.outlineFilters) {
+      for (const filter of Object.values(this.outlineFilters)) {
+        try {
+          filter.destroy();
+        } catch {
+          // The filter's GPU resources may already be gone with the renderer,
+          // and destroy() can run twice from React's unmount path.
+        }
+      }
+    }
   }
 
   /**
@@ -450,21 +524,76 @@ export class PixiGame {
   // -----------------------------------------------------------------------
 
   /**
-   * Build a shape-following outline filter. The OutlineFilter traces the
-   * sprite's opaque pixels, so the coloured ring hugs the exact silhouette
-   * without a tinted underlay that could distort the artwork's colours. Extra
-   * padding keeps the ring a couple pixels clear of the sprite edge.
+   * Build the shared contour filters, one per variant. OutlineFilter traces
+   * the sprite's opaque pixels, so the ink hugs the exact silhouette without a
+   * tinted underlay that could distort the artwork's colours.
+   *
+   * Colour, opacity and quality are baked in here (quality is compiled into
+   * the filter's shader and cannot change afterwards); the pen weight and the
+   * pulse are driven per frame by {@link updateOutlineStyles}.
    */
-  private createOutlineFilter(thickness: number, color: number): OutlineFilter {
-    const filter = new OutlineFilter({
-      thickness,
-      color,
-      quality: 0.3,
-      alpha: 1,
-    });
-    // Give the filter room so a thicker/offset outline is not clipped.
-    filter.padding = thickness + OUTLINE_PADDING;
-    return filter;
+  private createOutlineStyles(): void {
+    const filters = {} as Record<OutlineVariant, OutlineFilter>;
+
+    for (const variant of Object.keys(OUTLINE_STYLES) as OutlineVariant[]) {
+      const spec = OUTLINE_STYLES[variant];
+      const filter = new OutlineFilter({
+        thickness: spec.pen,
+        color: spec.color,
+        alpha: spec.alpha,
+        quality: spec.quality,
+      });
+      filter.padding = OUTLINE_PADDING;
+      filters[variant] = filter;
+    }
+
+    this.outlineFilters = filters;
+
+    // Seed the frame-driven values so the very first frame is already inked
+    // at the right weight instead of at the raw world-space pen width.
+    this.updateOutlineStyles(0);
+  }
+
+  /**
+   * Re-weight the shared contours once per frame: convert each world-space pen
+   * width into the device pixels the shader expects, and breathe the two
+   * attention-seeking variants so a predator ring and edible food read as
+   * alive rather than as a flat sticker.
+   */
+  private updateOutlineStyles(dt: number): void {
+    this.outlinePulseTime += dt;
+
+    // world px → CSS px is the camera zoom; CSS px → device px is the
+    // renderer resolution, which is what the filter's sample offsets use.
+    const resolution = this.app.renderer.resolution;
+
+    for (const variant of Object.keys(this.outlineFilters) as OutlineVariant[]) {
+      const spec = OUTLINE_STYLES[variant];
+      const filter = this.outlineFilters[variant];
+
+      const screenPx = Math.min(
+        OUTLINE_MAX_SCREEN_PX,
+        Math.max(OUTLINE_MIN_SCREEN_PX, spec.pen * this.zoom),
+      );
+      filter.thickness = screenPx * resolution;
+
+      if (spec.pulseDepth && spec.pulsePeriod) {
+        // Cosine wave in [0, 1] — full-strength ink at the start of a cycle,
+        // dimmed by at most pulseDepth halfway through it.
+        const wave =
+          0.5 - 0.5 * Math.cos((this.outlinePulseTime / spec.pulsePeriod) * Math.PI * 2);
+        filter.alpha = spec.alpha * (1 - spec.pulseDepth * wave);
+      }
+    }
+  }
+
+  /**
+   * Dress a sprite in the contour for {@code variant}. All sprites of a
+   * variant share one filter instance, so this is only a chain assignment —
+   * call it when the meaning changes, not every frame.
+   */
+  private applyOutline(sprite: Sprite, variant: OutlineVariant): void {
+    sprite.filters = this.outlineFilters[variant];
   }
 
   // -----------------------------------------------------------------------
@@ -725,13 +854,12 @@ export class PixiGame {
     sprite.width = p.radius * 2;
     sprite.height = p.radius * 2;
 
-    // Shape-following threat outline applied directly to the sprite. Because
+    // Shape-following threat contour applied directly to the sprite. Because
     // it lives on the sprite (not a separate object), it disappears with the
-    // sprite on evolution and never leaves an orphaned ring behind. Colour is
-    // updated each tick in updatePlayerAdornments based on the local player's
-    // tier.
-    const outline = this.createOutlineFilter(PLAYER_OUTLINE_THICKNESS, OUTLINE_COLOR_NEUTRAL);
-    sprite.filters = [outline];
+    // sprite on evolution and never leaves an orphaned ring behind. The
+    // variant is re-decided each tick in updatePlayerAdornments based on the
+    // local player's tier.
+    this.applyOutline(sprite, 'neutral');
 
     // Tail counter-attack hitbox marker — drawn beneath the sprite so it
     // reads as a glowing patch behind the animal. Only shown for players
@@ -777,9 +905,8 @@ export class PixiGame {
       nameLabel,
       healthBar,
       oceanSurvivalBar,
-      outline,
       tailHitbox,
-      outlineColor: null,
+      outlineVariant: 'neutral',
       displayX: p.x,
       displayY: p.y,
       displayAngle: p.angle,
@@ -801,8 +928,8 @@ export class PixiGame {
     newAnimalId: string,
     newRadius: number,
   ): void {
-    // Remove old sprite (its outline filter is attached to it, so it is torn
-    // down together — no orphaned border remains after evolution).
+    // Remove old sprite (its contour is attached to it, so the border goes
+    // away together with it — no orphaned ring remains after evolution).
     state.container.removeChild(state.sprite);
     state.sprite.destroy();
 
@@ -826,12 +953,9 @@ export class PixiGame {
     newSprite.width = newRadius * 2;
     newSprite.height = newRadius * 2;
 
-    // Reapply a fresh outline filter to the new sprite and reset the cached
-    // colour so updatePlayerAdornments repaints it on the next tick.
-    const outline = this.createOutlineFilter(PLAYER_OUTLINE_THICKNESS, OUTLINE_COLOR_NEUTRAL);
-    newSprite.filters = [outline];
-    state.outline = outline;
-    state.outlineColor = null;
+    // Carry the current contour meaning straight onto the new sprite so the
+    // evolved animal is never drawn unringed for a frame.
+    this.applyOutline(newSprite, state.outlineVariant);
 
     // Insert sprite above the tail hitbox but below the label and health bar.
     state.container.addChildAt(newSprite, 1);
@@ -866,7 +990,8 @@ export class PixiGame {
     for (const [id, state] of this.foodSprites) {
       if (!seenIds.has(id)) {
         this.layerFood.removeChild(state.sprite);
-        // Drop the outline filter so the pooled sprite starts clean on reuse.
+        // Drop the contour so the pooled sprite starts clean on reuse (the
+        // filter itself is shared and stays alive for the other food).
         state.sprite.filters = [];
         state.sprite.visible = false;
         this.foodSpritePool.push(state.sprite);
@@ -891,23 +1016,24 @@ export class PixiGame {
   }
 
   /**
-   * Recolour each food item's shape-following outline: deep green when the
-   * local player's tier is high enough to eat it, black when it cannot yet be
-   * eaten.
+   * Re-dress each food item's shape-following contour: a bright green ring
+   * when the local player's tier is high enough to eat it, a faint slate one
+   * when it cannot be eaten yet.
    */
   private updateFoodBorders(): void {
     const localTier = this.getLocalPlayerTier();
 
     for (const [, state] of this.foodSprites) {
       // Until we know the local player's tier, treat everything as edible so
-      // the outline doesn't flash black on first spawn.
+      // the contour doesn't flash the "out of reach" ink on first spawn.
       const edible = localTier === null ? true : localTier >= state.minTier;
-      const desiredColor = edible ? OUTLINE_COLOR_EDIBLE : OUTLINE_COLOR_INEDIBLE;
+      const variant: OutlineVariant = edible ? 'edible' : 'inedible';
 
-      // Skip redraw if the colour hasn't changed for this item.
-      if (state.outlineColor === desiredColor) continue;
-      state.outlineColor = desiredColor;
-      state.outline.color = desiredColor;
+      // Swapping the shared filter is the only per-sprite cost here, so skip
+      // it while the meaning is unchanged.
+      if (state.outlineVariant === variant) continue;
+      state.outlineVariant = variant;
+      this.applyOutline(state.sprite, variant);
     }
   }
 
@@ -946,16 +1072,16 @@ export class PixiGame {
     sprite.height = radius * 2;
     sprite.position.set(f.x, f.y);
 
-    // Shape-following edibility outline applied directly to the food sprite.
-    // Colour is decided in updateFoodBorders based on the local player's tier.
-    const outline = this.createOutlineFilter(FOOD_OUTLINE_THICKNESS, OUTLINE_COLOR_INEDIBLE);
-    sprite.filters = [outline];
+    // Shape-following edibility contour applied directly to the food sprite.
+    // updateFoodBorders (called right after every snapshot) upgrades it to the
+    // green ring when the local player's tier can eat this item.
+    this.applyOutline(sprite, 'inedible');
 
     this.layerFood.addChild(sprite);
 
     const minTier = foodDef?.minTier ?? 1;
 
-    return { sprite, outline, foodId: f.foodId, minTier, radius, outlineColor: null };
+    return { sprite, foodId: f.foodId, minTier, radius, outlineVariant: 'inedible' };
   }
 
 
@@ -1097,6 +1223,8 @@ export class PixiGame {
     this.updatePickupEffects(dt);
     this.updateEvolutionEffects(dt);
     this.updateCamera();
+    // After updateCamera so the pen weight uses this frame's zoom.
+    this.updateOutlineStyles(dt);
     this.updateGridDebug();
     this.updateFps(ticker.deltaMS);
   };
@@ -1209,13 +1337,13 @@ export class PixiGame {
   // -----------------------------------------------------------------------
 
   /**
-   * Colour the shape-following outline and draw the tail hitbox marker for
+   * Dress the shape-following contour and draw the tail hitbox marker for
    * every player relative to the local player's tier:
    *
-   * - Higher-tier opponents (a threat) get a red outline and a green tail
-   *   patch marking the counter-attack hitbox you can bite to fight back.
-   * - Same-or-lower-tier players (and the local player) get a plain black
-   *   outline and no tail marker.
+   * - Higher-tier opponents (a threat) get the pulsing red ring and a green
+   *   tail patch marking the counter-attack hitbox you can bite to fight back.
+   * - Same-or-lower-tier players (and the local player) get the quiet slate
+   *   contour and no tail marker.
    */
   private updatePlayerAdornments(): void {
     const localPlayerId = useGameStore.getState().localPlayerId;
@@ -1228,12 +1356,13 @@ export class PixiGame {
       // never a threat to itself.
       const isHigherTier = !isLocalPlayer && localTier !== null && tier > localTier;
 
-      // Recolour the shape-following outline: red for higher-tier threats,
-      // black otherwise. Only write when it actually changes.
-      const desiredColor = isHigherTier ? OUTLINE_COLOR_THREAT : OUTLINE_COLOR_NEUTRAL;
-      if (state.outlineColor !== desiredColor) {
-        state.outlineColor = desiredColor;
-        state.outline.color = desiredColor;
+      // Re-dress the shape-following contour: the red threat ring for
+      // higher-tier opponents, the quiet slate ink otherwise. Only swap the
+      // shared filter when the meaning actually changes.
+      const variant: OutlineVariant = isHigherTier ? 'threat' : 'neutral';
+      if (state.outlineVariant !== variant) {
+        state.outlineVariant = variant;
+        this.applyOutline(state.sprite, variant);
       }
 
       // Green counter-attack tail hitbox — only for higher-tier threats. The
@@ -1247,10 +1376,15 @@ export class PixiGame {
         // displayAngle points in the facing direction; the tail is opposite.
         const tx = -Math.cos(state.displayAngle) * tailDistance;
         const ty = -Math.sin(state.displayAngle) * tailDistance;
+        // Layered from a faint outer halo inward to a thin bright rim, so the
+        // marker fades into the artwork instead of sitting on it as a hard
+        // green disc.
+        tail.circle(tx, ty, tailRadius * 1.3);
+        tail.fill({ color: 0x4ade80, alpha: 0.12 });
         tail.circle(tx, ty, tailRadius);
-        tail.fill({ color: 0x22ff66, alpha: 0.4 });
+        tail.fill({ color: 0x22ff66, alpha: 0.26 });
         tail.circle(tx, ty, tailRadius);
-        tail.stroke({ width: 2, color: 0x16a34a, alpha: 0.9 });
+        tail.stroke({ width: 1.5, color: 0x4ade80, alpha: 0.75 });
       }
     }
   }

@@ -931,6 +931,58 @@ class GameWorldTest {
                 "dash burst should outlast a single tick");
     }
 
+
+    @Test
+    void biteKnockbacksTargetAwayFromAttacker() {
+        PlayerEntity attacker = world.spawnPlayer("p1", "Hunter");
+        PlayerEntity target = world.spawnPlayer("p2", "Snack");
+        attacker.setAnimal(AnimalDefinition.byId("fox")); // speed 185
+        setPlayerPosition(attacker, 500, 500);
+        setPlayerPosition(target, 510, 500);
+        attacker.setAngle(0);
+
+        world.tick(0.05);
+
+        // dash range = 185 * 3 (DASH_SPEED_MULTIPLIER) * 3 (DASH_DURATION_TICKS) * 0.05 = 83.25
+        // knockback = 0.75 * 83.25 = 62.4375, pushed along +x (directly away).
+        assertTrue(target.isAlive());
+        assertEquals(1, target.getHealth());
+        assertEquals(510 + 62.4375, target.getX(), 1e-6, "target shoved away by 0.75x dash range");
+        assertEquals(500, target.getY(), 1e-6, "no lateral drift when directly aside");
+    }
+
+    @Test
+    void rearBiteStillKnockbacksTargetAway() {
+        // Attacker faces the target, target faces away (bitten from behind).
+        PlayerEntity attacker = world.spawnPlayer("p1", "Hunter");
+        PlayerEntity target = world.spawnPlayer("p2", "Snack");
+        attacker.setAnimal(AnimalDefinition.byId("fox"));
+        setPlayerPosition(attacker, 500, 500);
+        setPlayerPosition(target, 510, 500);
+        attacker.setAngle(0);
+        target.setAngle(0);
+
+        world.tick(0.05);
+
+        assertEquals(510 + 62.4375, target.getX(), 1e-6);
+    }
+
+    @Test
+    void knockbackIsClampedToWorldBounds() {
+        PlayerEntity attacker = world.spawnPlayer("p1", "Hunter");
+        PlayerEntity target = world.spawnPlayer("p2", "Snack");
+        attacker.setAnimal(AnimalDefinition.byId("fox"));
+        double targetRadius = target.getRadius();
+        // Place target hard against the right wall so the push would leave the map.
+        setPlayerPosition(attacker, WIDTH - 30, 500);
+        setPlayerPosition(target, WIDTH - 20, 500);
+        attacker.setAngle(0);
+
+        world.tick(0.05);
+
+        assertEquals(WIDTH - targetRadius, target.getX(), 1e-6, "knockback keeps the victim inside the world");
+    }
+
     @SuppressWarnings("unchecked")
     private FoodEntity addFoodAt(String instanceId, FoodDefinition definition, double x, double y) {
         try {

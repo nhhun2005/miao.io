@@ -65,6 +65,23 @@ public class PlayerEntity {
      */
     private static final double DEHYDRATION_HP_FRACTION_PER_SECOND = 0.05;
 
+    /**
+     * Passive health regeneration. A creature that has avoided damage for
+     * {@link #REGEN_DELAY_SECONDS} seconds starts healing {@link #REGEN_HP_FRACTION}
+     * of its maximum health every {@link #REGEN_INTERVAL_SECONDS} seconds until
+     * it is back to full health.
+     */
+    private static final double REGEN_DELAY_SECONDS = 5.0;
+    private static final double REGEN_HP_FRACTION = 0.10;
+    private static final double REGEN_INTERVAL_SECONDS = 2.0;
+
+    /** Seconds elapsed since this creature last took damage. */
+    private double secondsSinceDamage = 0;
+
+    /** Accumulated seconds toward the next regeneration tick. */
+    /** Number of regeneration intervals already applied since the last damage. */
+    private int intervalsHealed = 0;
+
     // Latest queued input (set by the WebSocket handler, consumed by the tick)
     private volatile InputMessage pendingInput;
 
@@ -204,6 +221,59 @@ public class PlayerEntity {
         this.y = y;
     }
 
+    /**
+     * Distance this creature would travel over a full dash burst, assuming a
+     * full-intensity dash. Used to scale knockback relative to dash range.
+     *
+     * @param deltaTime          seconds elapsed per tick
+     * @param dashSpeedMultiplier the dash speed multiplier applied during a burst
+     */
+    public double dashDistance(double deltaTime, double dashSpeedMultiplier) {
+        return animal.speed() * dashSpeedMultiplier * DASH_DURATION_TICKS * deltaTime;
+    }
+
+    /**
+     * Push this creature directly away from the given source point by the
+     * requested distance, clamped to the world bounds. Used to knock a bitten
+     * creature back from its attacker.
+     *
+     * @param sourceX     x of the point to be pushed away from (the attacker)
+     * @param sourceY     y of the point to be pushed away from (the attacker)
+     * @param distance    push distance in world units
+     * @param worldWidth  world width for clamping
+     * @param worldHeight world height for clamping
+     */
+    public void applyKnockback(double sourceX,
+                               double sourceY,
+                               double distance,
+                               double worldWidth,
+                               double worldHeight) {
+        if (distance <= 0) {
+            return;
+        }
+        double dx = this.x - sourceX;
+        double dy = this.y - sourceY;
+        double len = Math.hypot(dx, dy);
+        double dirX;
+        double dirY;
+        if (len < 1e-9) {
+            // Perfectly overlapping (e.g. bitten from behind at point-blank):
+            // fall back to shoving along this creature's own heading.
+            dirX = Math.cos(angle);
+            dirY = Math.sin(angle);
+        } else {
+            dirX = dx / len;
+            dirY = dy / len;
+        }
+
+        this.x += dirX * distance;
+        this.y += dirY * distance;
+
+        double r = animal.radius();
+        this.x = Math.max(r, Math.min(worldWidth - r, this.x));
+        this.y = Math.max(r, Math.min(worldHeight - r, this.y));
+    }
+
     public void setAngle(double angle) {
         this.angle = angle;
     }
@@ -220,6 +290,7 @@ public class PlayerEntity {
 
     public void damage(double amount) {
         this.health = Math.max(0, this.health - amount);
+        markDamaged();
         if (this.health <= 0) {
             kill();
         }
@@ -227,6 +298,7 @@ public class PlayerEntity {
 
     public void damageByBite() {
         this.health = Math.max(0, this.health - 1);
+        markDamaged();
     }
 
     public boolean isDeadByHealth() {
@@ -237,6 +309,7 @@ public class PlayerEntity {
         this.animal = animal;
         this.health = animal.maxHealth();
         this.evolutionOptionsSent = false;
+        resetRegen();
         resetWater();
     }
 
@@ -285,6 +358,7 @@ public class PlayerEntity {
             // Dehydration: no water left, drain 5% of max health per second.
             double dehydrationDamage = getMaxHealth() * DEHYDRATION_HP_FRACTION_PER_SECOND * deltaTime;
             this.health = Math.max(0, this.health - dehydrationDamage);
+            markDamaged();
             if (this.health <= 0) {
                 kill();
             }
@@ -297,6 +371,50 @@ public class PlayerEntity {
      */
     public void refillWaterOnFood() {
         this.water = Math.min(this.maxWater, this.water + WATER_RESTORED_PER_FOOD);
+    }
+
+    /**
+     * Reset the damage timer so passive regeneration has to wait the full
+     * {@link #REGEN_DELAY_SECONDS} again before it resumes. Call this whenever
+     * the creature loses health.
+     */
+    private void markDamaged() {
+        this.secondsSinceDamage = 0;
+        this.intervalsHealed = 0;
+    }
+
+    private void resetRegen() {
+        this.secondsSinceDamage = 0;
+        this.intervalsHealed = 0;
+    }
+
+    /**
+     * Passively regenerate health each tick. A creature heals only after it has
+     * gone {@link #REGEN_DELAY_SECONDS} seconds without taking damage, at which
+     * point it recovers {@link #REGEN_HP_FRACTION} of its maximum health every
+     * {@link #REGEN_INTERVAL_SECONDS} seconds until back to full.
+     *
+     * @param deltaTime seconds elapsed this tick
+     */
+    public void regenerateHealth(double deltaTime) {
+        if (deltaTime <= 0 || !alive) {
+            return;
+        }
+
+        this.secondsSinceDamage += deltaTime;
+
+        if (this.secondsSinceDamage < REGEN_DELAY_SECONDS || this.health >= getMaxHealth()) {
+            return;
+        }
+
+        // Only time accrued past the delay counts toward the heal interval, so
+        // the delay is never mistaken for regeneration time.
+        int intervalsEarned = (int) ((this.secondsSinceDamage - REGEN_DELAY_SECONDS) / REGEN_INTERVAL_SECONDS);
+        while (this.intervalsHealed < intervalsEarned && this.health < getMaxHealth()) {
+            this.intervalsHealed++;
+            double healAmount = getMaxHealth() * REGEN_HP_FRACTION;
+            this.health = Math.min(getMaxHealth(), this.health + healAmount);
+        }
     }
 
     private void resetWater() {

@@ -73,6 +73,13 @@ public class GameWorld {
     private static final double BITE_ARC_RADIANS = Math.PI * 2.0 / 3.0;
 
     /**
+     * Knockback distance applied to a bitten creature, expressed as a fraction
+     * of a full dash's travel distance. A bite shoves the victim away from the
+     * attacker by 0.75x the distance a dash would cover.
+     */
+    private static final double BITE_KNOCKBACK_DASH_FRACTION = 0.75;
+
+    /**
      * Height in world pixels of the river band that crosses the land biome.
      * Mirrors the river rectangle drawn client-side in
      * PixiGame.renderBackground so the visual and the water source align.
@@ -171,6 +178,10 @@ public class GameWorld {
         // dehydrate when empty on land).
         checkWater(deltaTime);
 
+        // 2b. Passively regenerate health for creatures that have avoided
+        // damage long enough.
+        regenerateHealth(deltaTime);
+
         // 3. Rebuild spatial grid with current entity positions for collision queries.
         rebuildSpatialGrid();
 
@@ -178,7 +189,7 @@ public class GameWorld {
         checkFoodCollisionsSpatial();
 
         // 4. Resolve player-vs-player predation.
-        checkPlayerPredation();
+        checkPlayerPredation(deltaTime);
 
         // 5. Send evolution options once a player has enough XP for the next tier.
         checkEvolutionOptions();
@@ -243,6 +254,19 @@ public class GameWorld {
                         0.0,
                         Math.max(0, System.currentTimeMillis() - spawnedAt)
                 ));
+            }
+        }
+    }
+
+    /**
+     * Passively regenerate every alive creature's health. A creature only
+     * heals once it has gone long enough without taking damage; the timing is
+     * owned by {@link PlayerEntity#regenerateHealth(double)}.
+     */
+    private void regenerateHealth(double deltaTime) {
+        for (PlayerEntity player : players.values()) {
+            if (player.isAlive()) {
+                player.regenerateHealth(deltaTime);
             }
         }
     }
@@ -369,8 +393,9 @@ public class GameWorld {
         }
     }
 
-    private void checkPlayerPredation() {
+    private void checkPlayerPredation(double deltaTime) {
         Set<String> killedThisTick = new HashSet<>();
+        List<PendingKnockback> knockbacks = new ArrayList<>();
 
         for (PlayerEntity attacker : players.values()) {
             if (!attacker.isAlive()) {
@@ -384,15 +409,29 @@ public class GameWorld {
                 if (killedThisTick.contains(target.getId())) {
                     continue;
                 }
-                BiteResult result = applyBite(attacker, target);
+                BiteResult result = applyBite(attacker, target, deltaTime, knockbacks);
                 if (result.killed()) {
                     killedThisTick.add(target.getId());
                 }
             }
         }
+
+        // Apply knockbacks only after every bite this tick has been resolved.
+        // Pushing a victim the instant it is bitten would otherwise shove it out
+        // of range before a mutual/simultaneous attacker gets its own bite in.
+        for (PendingKnockback kb : knockbacks) {
+            if (kb.target().isAlive()) {
+                kb.target().applyKnockback(kb.sourceX(), kb.sourceY(), kb.distance(), width, height);
+            }
+        }
     }
 
-    private BiteResult applyBite(PlayerEntity attacker, PlayerEntity target) {
+    /** A knockback queued during predation, applied once all bites resolve. */
+    private record PendingKnockback(PlayerEntity target, double sourceX, double sourceY, double distance) {
+    }
+
+    private BiteResult applyBite(PlayerEntity attacker, PlayerEntity target, double deltaTime,
+                                 List<PendingKnockback> knockbacks) {
         if (attacker == null || target == null || attacker == target) {
             return BiteResult.noHit();
         }
@@ -412,6 +451,7 @@ public class GameWorld {
         boolean lethal = target.getHealth() <= 1;
         double stolenXp = transferXpOnBite(attacker, target, lethal);
         target.damageByBite();
+        knockbacks.add(buildBiteKnockback(attacker, target, deltaTime));
         log.debug("{} bit {} (-1hp, stolenXp={}, health={}/{})",
                 attacker.getNickname(), target.getNickname(), stolenXp, target.getHealth(), target.getMaxHealth());
 
@@ -435,6 +475,19 @@ public class GameWorld {
 
         log.debug("{} bit {} to death (+{}xp stolen)", attacker.getNickname(), target.getNickname(), stolenXp);
         return new BiteResult(true, stolenXp);
+    }
+
+    /**
+     * Shove a freshly bitten creature directly away from its attacker. The push
+     * distance is {@link #BITE_KNOCKBACK_DASH_FRACTION} of the attacker's full
+     * dash range, so being bitten always throws the victim a fixed fraction of
+     * a dash away regardless of who delivered the bite (a higher-tier predator
+     * or a same-facing "rear" bite included).
+     */
+    private PendingKnockback buildBiteKnockback(PlayerEntity attacker, PlayerEntity target, double deltaTime) {
+        double distance = attacker.dashDistance(deltaTime, DASH_SPEED_MULTIPLIER)
+                * BITE_KNOCKBACK_DASH_FRACTION;
+        return new PendingKnockback(target, attacker.getX(), attacker.getY(), distance);
     }
 
     private double transferXpOnBite(PlayerEntity attacker, PlayerEntity target, boolean lethal) {
