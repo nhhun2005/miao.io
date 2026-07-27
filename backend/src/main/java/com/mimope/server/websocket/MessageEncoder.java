@@ -39,10 +39,6 @@ public class MessageEncoder {
      */
     public void send(ClientSession session, String type, Map<String, Object> fields) {
         WebSocketSession ws = session.getWebSocketSession();
-        if (!ws.isOpen()) {
-            return;
-        }
-
         Map<String, Object> envelope = new LinkedHashMap<>();
         envelope.put("type", type);
         if (fields != null) {
@@ -52,9 +48,18 @@ public class MessageEncoder {
         try {
             String json = objectMapper.writeValueAsString(envelope);
             synchronized (ws) {
+                // Re-check while holding the same monitor used for writes. The
+                // socket can close after an earlier isOpen() check while the
+                // game loop is building a snapshot.
+                if (!ws.isOpen()) {
+                    return;
+                }
                 ws.sendMessage(new TextMessage(json));
             }
-        } catch (IOException e) {
+        } catch (IOException | IllegalStateException e) {
+            // Tomcat reports a close racing with sendMessage as an unchecked
+            // IllegalStateException. A single disconnected client must not
+            // abort the entire game-loop tick.
             log.warn("Failed to send '{}' to session {}: {}", type, session.getId(), e.getMessage());
         }
     }

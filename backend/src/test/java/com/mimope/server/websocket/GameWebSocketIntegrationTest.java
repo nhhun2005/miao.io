@@ -2,6 +2,8 @@ package com.mimope.server.websocket;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.websocket.ContainerProvider;
+import jakarta.websocket.WebSocketContainer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -77,7 +79,11 @@ class GameWebSocketIntegrationTest {
 
     private RecordingClient connect() throws Exception {
         RecordingClient handler = new RecordingClient();
-        StandardWebSocketClient client = new StandardWebSocketClient();
+        WebSocketContainer container = ContainerProvider.getWebSocketContainer();
+        // A snapshot with the full food population can exceed the JSR-356
+        // client's small 8 KiB default receive buffer.
+        container.setDefaultMaxTextMessageBufferSize(1_048_576);
+        StandardWebSocketClient client = new StandardWebSocketClient(container);
         URI uri = URI.create("ws://localhost:" + port + "/ws/game");
         client.execute(handler, new WebSocketHttpHeaders(), uri).get(20, TimeUnit.SECONDS);
         await().atMost(20, TimeUnit.SECONDS).until(() -> handler.session != null && handler.session.isOpen());
@@ -162,7 +168,6 @@ class GameWebSocketIntegrationTest {
         return gameRoom.getWorld().getPlayer(playerId) != null;
     }
 }
-
 
 
 

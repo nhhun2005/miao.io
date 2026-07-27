@@ -201,14 +201,11 @@ public class GameWorld {
         // 5. Send evolution options once a player has enough XP for the next tier.
         checkEvolutionOptions();
 
-        // 4. Despawn stale food (protecting items near players so they don't
-        // vanish just as someone approaches to eat them).
-        foodSpawnService.despawnStaleFood(foods, tick, players.values());
+        // 4. Replenish consumed food. Uneaten food is never removed merely
+        // because of its age, so it cannot vanish while a player approaches.
+        foodSpawnService.replenishFood(foods);
 
-        // 5. Replenish food if under the cap
-        foodSpawnService.replenishFood(foods, tick);
-
-        // 6. Rebuild again after collision removals/despawns/replenishment so
+        // 5. Rebuild again after collision removals/replenishment so
         // visibility snapshots sent immediately after this tick can include the
         // current world contents. Without this, newly spawned food existed in
         // the authoritative map but was absent from the spatial grid until the
@@ -381,7 +378,6 @@ public class GameWorld {
         // Remove consumed food
         for (String id : consumedIds) {
             foods.remove(id);
-            foodSpawnService.onFoodConsumed(id);
         }
     }
 
@@ -649,11 +645,7 @@ public class GameWorld {
      * Remove a food entity by instance ID (e.g. after pickup).
      */
     public FoodEntity removeFood(String instanceId) {
-        FoodEntity removed = foods.remove(instanceId);
-        if (removed != null) {
-            foodSpawnService.onFoodConsumed(instanceId);
-        }
-        return removed;
+        return foods.remove(instanceId);
     }
 
     public Collection<FoodEntity> getFoods() {

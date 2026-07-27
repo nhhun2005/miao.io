@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -284,6 +286,25 @@ class GameWorldTest {
         // Next tick should replenish
         world.tick(0.05);
         assertEquals(MAX_FOOD, world.getFoodCount());
+    }
+
+    @Test
+    void foodDoesNotDespawnBecauseOfAge() {
+        world.tick(0.05);
+        Set<String> originalFoodIds = world.getFoods().stream()
+                .map(FoodEntity::getInstanceId)
+                .collect(Collectors.toSet());
+
+        // Food used to become eligible for random despawn after 1,200 ticks.
+        for (int i = 0; i < 1_300; i++) {
+            world.tick(0.05);
+        }
+
+        Set<String> currentFoodIds = world.getFoods().stream()
+                .map(FoodEntity::getInstanceId)
+                .collect(Collectors.toSet());
+        assertEquals(originalFoodIds, currentFoodIds,
+                "Uneaten food must remain until a player consumes it");
     }
 
     @Test
