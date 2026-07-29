@@ -10,7 +10,7 @@
 // Protocol version — must match backend ProtocolConstants.PROTOCOL_VERSION
 // ---------------------------------------------------------------------------
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 // ---------------------------------------------------------------------------
 // Message type constants
@@ -22,8 +22,6 @@ export const ClientMessageType = {
   INPUT: 'input',
   EVOLVE: 'evolve',
   PING: 'ping',
-  GRID_DEBUG: 'grid_debug',
-  DEBUG_LEVEL_UP: 'debug_levelup',
 } as const;
 
 /** Server → Client message types. */
@@ -74,24 +72,12 @@ export interface PingMessage {
   timestamp: number;
 }
 
-export interface GridDebugMessage {
-  type: typeof ClientMessageType.GRID_DEBUG;
-  enabled: boolean;
-}
-
-/** Debug-only: instantly evolve the player to the next tier. */
-export interface DebugLevelUpMessage {
-  type: typeof ClientMessageType.DEBUG_LEVEL_UP;
-}
-
 /** Union of all client → server messages. */
 export type ClientMessage =
   | JoinMessage
   | InputMessage
   | EvolveMessage
-  | PingMessage
-  | GridDebugMessage
-  | DebugLevelUpMessage;
+  | PingMessage;
 
 // ---------------------------------------------------------------------------
 // Server → Client messages
@@ -164,16 +150,6 @@ export interface DashEventData {
   angle: number;
 }
 
-/** Grid cell info for debug visualization. */
-export interface GridCellDebug {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  playerCount: number;
-  foodCount: number;
-}
-
 /** Periodic world state update. */
 export interface SnapshotMessage {
   type: typeof ServerMessageType.SNAPSHOT;
@@ -184,7 +160,6 @@ export interface SnapshotMessage {
   foodPickups?: FoodPickupData[];
   killEvents?: KillEventData[];
   dashEvents?: DashEventData[];
-  gridDebug?: GridCellDebug[];
 }
 
 /** Evolution option presented to the player. */
@@ -262,14 +237,6 @@ export function createPingMessage(): PingMessage {
   return { type: ClientMessageType.PING, timestamp: Date.now() };
 }
 
-export function createGridDebugMessage(enabled: boolean): GridDebugMessage {
-  return { type: ClientMessageType.GRID_DEBUG, enabled };
-}
-
-export function createDebugLevelUpMessage(): DebugLevelUpMessage {
-  return { type: ClientMessageType.DEBUG_LEVEL_UP };
-}
-
 // ---------------------------------------------------------------------------
 // Message parsing (server → client)
 // ---------------------------------------------------------------------------
@@ -344,9 +311,6 @@ function parseSnapshot(data: Record<string, unknown>): SnapshotMessage | null {
       : undefined,
     dashEvents: Array.isArray(data.dashEvents)
       ? (data.dashEvents as DashEventData[])
-      : undefined,
-    gridDebug: Array.isArray(data.gridDebug)
-      ? (data.gridDebug as GridCellDebug[])
       : undefined,
   };
 }

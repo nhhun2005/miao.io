@@ -49,14 +49,24 @@ public record InputMessage(
 
         Number intensityNum = raw.getNumber("intensity");
         Number timestampNum = raw.getNumber("timestamp");
+        double seqValue = seqNum.doubleValue();
+        double angle = angleNum.doubleValue();
+        double intensity = intensityNum != null ? intensityNum.doubleValue() : 1.0;
+        if (!Double.isFinite(seqValue) || seqValue != Math.rint(seqValue)
+                || seqValue < Integer.MIN_VALUE || seqValue > Integer.MAX_VALUE
+                || !Double.isFinite(angle) || !Double.isFinite(intensity)) {
+            return null;
+        }
+        angle = Math.atan2(Math.sin(angle), Math.cos(angle));
+        intensity = Math.max(0.0, Math.min(1.0, intensity));
 
         // Boolean fields: Jackson deserialises them as Boolean objects in the Map
         Object dashObj = raw.payload().get("dash");
 
         return new InputMessage(
-                seqNum.intValue(),
-                angleNum.doubleValue(),
-                intensityNum != null ? intensityNum.doubleValue() : 1.0,
+                (int) seqValue,
+                angle,
+                intensity,
                 dashObj instanceof Boolean d ? d : false,
                 timestampNum != null ? timestampNum.longValue() : 0L
         );

@@ -151,21 +151,15 @@ class GameWebSocketHandlerTest {
     }
 
     @Test
-    void gridDebugToggleUpdatesRoomSetting() throws Exception {
+    void removedDebugMessageIsRejectedAsUnknown() throws Exception {
         WebSocketSession ws = mockWsSession("s1");
         handler.afterConnectionEstablished(ws);
 
         handler.handleMessage(ws, new TextMessage("""
                 {"type":"grid_debug","enabled":true}
                 """));
-
-        assertTrue(gameRoom.isGridDebugEnabled());
-
-        handler.handleMessage(ws, new TextMessage("""
-                {"type":"grid_debug","enabled":false}
-                """));
-
-        assertFalse(gameRoom.isGridDebugEnabled());
+        verify(ws, atLeastOnce()).sendMessage(argThat(m ->
+                ((TextMessage) m).getPayload().contains("Unknown message type: grid_debug")));
     }
 
     @Test

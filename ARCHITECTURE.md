@@ -304,8 +304,7 @@ backend/src/main/java/com/mimope/server/
     │   ├── JoinMessage.java
     │   ├── InputMessage.java
     │   ├── EvolveMessage.java
-    │   ├── PingMessage.java
-    │   └── GridDebugMessage.java
+    │   └── PingMessage.java
     └── outbound/
         ├── WelcomeMessage.java
         ├── SnapshotMessage.java
@@ -315,10 +314,12 @@ backend/src/main/java/com/mimope/server/
         └── ErrorMessage.java
 ```
 
-Note: game simulation, spatial partitioning, leaderboard aggregation, and
-snapshot building currently live inside the `game/` package (`GameWorld`,
-`GameRoom`) rather than in the separate `world/`, `player/`, `animal/`,
-`food/`, and `leaderboard/` packages sketched in earlier drafts.
+`GameWorld` owns authoritative collections and orchestrates focused movement,
+water, regeneration, food-collision, predation, and evolution systems.
+`WorldEventBuffer` owns the one-tick event lifetime. External join, remove,
+evolve, force-kill, and test-support XP mutations are typed commands drained
+by the game-loop thread; movement remains a thread-safe latest-wins input.
+`GameRoom` handles bounded command waits and snapshot/network orchestration.
 
 ### 4.4 Server Game Loop
 
@@ -333,17 +334,22 @@ Recommended loop:
 Tick flow:
 
 ```text
-read queued inputs
-update player movement
-apply dash
-resolve collisions
-apply food pickup
-apply damage/death
-apply XP/evolution
-spawn/despawn world entities
-build snapshots
-broadcast snapshots
+clear tick event buffer
+drain typed world commands
+resolve retained movement and dash
+update water and health regeneration
+rebuild spatial grid
+resolve food collision and predation
+emit evolution options
+replenish food
+rebuild spatial grid for snapshot visibility
+broadcast filtered snapshots
 ```
+
+WebSocket origin patterns are bound from
+`game.websocket.allowed-origin-patterns`. Localhost and `127.0.0.1` are the
+safe defaults; deployment adds its public frontend origin through
+`GAME_WEBSOCKET_ALLOWED_ORIGIN_PATTERNS`.
 
 ### 4.5 Spatial Partitioning
 
@@ -414,9 +420,9 @@ the default starter. Valid starters are `mouse`, `shrimp`, and `chipmunk`.
 }
 ```
 
-The client also sends `grid_debug` (`{ "enabled": true }`) and, in
-development builds, `debug_levelup` to trigger the spatial-grid overlay and
-an instant evolution respectively.
+Production protocol messages cannot mutate XP for debugging or request
+spatial-grid visualization. Profile-gated test-support endpoints provide
+deterministic E2E setup without exposing those capabilities in production.
 
 ### 5.3 Server To Client Messages
 
@@ -425,7 +431,7 @@ an instant evolution respectively.
   "type": "welcome",
   "playerId": "p_123",
   "nickname": "Player",
-  "protocolVersion": 1
+  "protocolVersion": 2
 }
 ```
 
@@ -438,12 +444,11 @@ an instant evolution respectively.
   "leaderboard": [],
   "foodPickups": [],
   "killEvents": [],
-  "dashEvents": [],
-  "gridDebug": []
+  "dashEvents": []
 }
 ```
 
-The event arrays (`foodPickups`, `killEvents`, `dashEvents`, `gridDebug`) are
+The event arrays (`foodPickups`, `killEvents`, `dashEvents`) are
 omitted from the payload when empty.
 
 ```json

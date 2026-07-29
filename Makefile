@@ -1,7 +1,7 @@
 .PHONY: frontend-install frontend-dev frontend-build frontend-lint frontend-test backend-test backend-dev compose-up compose-down check-ids load-test verify-clean-clone
 
 frontend-install:
-	cd frontend && npm install
+	cd frontend && npm ci
 
 frontend-dev:
 	cd frontend && npm run dev

@@ -16,7 +16,6 @@ Use this checklist before marking a build as a release candidate.
 - Hold left-click (or Space/W) down and verify the dash re-fires automatically every cooldown; release and verify it stops.
 - Move the pointer near the centre of the screen and then far out, and verify the travel speed is identical — the pointer only sets direction.
 - Drain the water bar below 10% and verify dashing is blocked until it refills.
-- Toggle grid debug and verify the spatial grid overlay appears and disappears.
 - Refresh one connected tab and verify the other tab remains connected.
 - Send malformed WebSocket messages during development and verify server returns `error`.
 - Run `node scripts/load-test.mjs` against a running backend.

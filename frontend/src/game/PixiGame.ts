@@ -148,8 +148,6 @@ export interface PixiGameOptions {
   container: HTMLElement;
   /** The GameConnection to send inputs and receive snapshots. */
   connection: GameConnection;
-  /** Whether to show the spatial grid debug overlay. */
-  showGridDebug?: boolean;
 }
 
 /** State tracked per rendered player sprite. */
@@ -277,10 +275,6 @@ export class PixiGame {
   private pickupEffects: FoodPickupEffect[] = [];
   private evolutionEffects: EvolutionEffect[] = [];
 
-  // Grid debug graphics
-  private gridDebugGraphics: Graphics | null = null;
-  private gridDebugLabels: Text[] = [];
-
   // FPS tracking
   private fpsText: Text | null = null;
   private fpsFrames = 0;
@@ -308,10 +302,6 @@ export class PixiGame {
     this.connection = options.connection;
     this.boundOnSnapshot = this._onSnapshot.bind(this);
 
-    // If showGridDebug is enabled, request grid debug data from the server
-    if (options.showGridDebug) {
-      this.connection.sendGridDebugToggle(true);
-    }
   }
 
   // -----------------------------------------------------------------------
@@ -1226,83 +1216,8 @@ export class PixiGame {
     this.updateCamera();
     // After updateCamera so the pen weight uses this frame's zoom.
     this.updateOutlineStyles(dt);
-    this.updateGridDebug();
     this.updateFps(ticker.deltaMS);
   };
-
-  // -----------------------------------------------------------------------
-  // Grid debug visualization
-  // -----------------------------------------------------------------------
-
-  private updateGridDebug(): void {
-    const gridDebug = useGameStore.getState().gridDebug;
-    if (!gridDebug || gridDebug.length === 0) {
-      if (this.gridDebugGraphics) {
-        this.gridDebugGraphics.parent?.removeChild(this.gridDebugGraphics);
-        this.gridDebugGraphics.destroy({ children: true });
-        this.gridDebugGraphics = null;
-      }
-      // Clear label pool
-      for (const label of this.gridDebugLabels) {
-        label.destroy();
-      }
-      this.gridDebugLabels = [];
-      return;
-    }
-
-    if (!this.gridDebugGraphics) {
-      this.gridDebugGraphics = new Graphics();
-      this.worldContainer.addChild(this.gridDebugGraphics);
-    }
-
-    const g = this.gridDebugGraphics;
-    g.clear();
-
-    // Remove old labels from graphics
-    for (const label of this.gridDebugLabels) {
-      if (label.parent === g) {
-        g.removeChild(label);
-      }
-    }
-
-    // Draw grid cell outlines
-    g.setStrokeStyle({ width: 1, color: 0x00ffff, alpha: 0.3 });
-
-    for (const cell of gridDebug) {
-      g.rect(cell.x, cell.y, cell.w, cell.h);
-    }
-    g.stroke();
-
-    // Reuse or create labels
-    const style = new TextStyle({
-      fontSize: 10,
-      fontFamily: 'monospace',
-      fill: 0x00ffff,
-    });
-
-    for (let i = 0; i < gridDebug.length; i++) {
-      const cell = gridDebug[i];
-      let label: Text;
-      if (i < this.gridDebugLabels.length) {
-        label = this.gridDebugLabels[i];
-        label.text = `${cell.playerCount}p ${cell.foodCount}f`;
-        label.visible = true;
-      } else {
-        label = new Text({
-          text: `${cell.playerCount}p ${cell.foodCount}f`,
-          style,
-        });
-        this.gridDebugLabels.push(label);
-      }
-      label.position.set(cell.x + 2, cell.y + 2);
-      g.addChild(label);
-    }
-
-    // Hide unused labels
-    for (let i = gridDebug.length; i < this.gridDebugLabels.length; i++) {
-      this.gridDebugLabels[i].visible = false;
-    }
-  }
 
   // -----------------------------------------------------------------------
   // Interpolation — smoothly move sprites toward server positions

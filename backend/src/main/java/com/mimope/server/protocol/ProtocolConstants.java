@@ -11,15 +11,13 @@ public final class ProtocolConstants {
      * Current protocol version. Incremented when breaking changes are made
      * to the message format. Both client and server must agree on this value.
      */
-    public static final int PROTOCOL_VERSION = 1;
+    public static final int PROTOCOL_VERSION = 2;
 
     // ------------------------------------------------------------------ Client → Server message types
     public static final String TYPE_JOIN = "join";
     public static final String TYPE_INPUT = "input";
     public static final String TYPE_EVOLVE = "evolve";
     public static final String TYPE_PING = "ping";
-    public static final String TYPE_GRID_DEBUG = "grid_debug";
-    public static final String TYPE_DEBUG_LEVEL_UP = "debug_levelup";
 
     // ------------------------------------------------------------------ Server → Client message types
     public static final String TYPE_WELCOME = "welcome";

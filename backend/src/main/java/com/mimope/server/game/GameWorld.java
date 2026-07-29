@@ -43,16 +43,13 @@ public class GameWorld {
      * List of food pickup events that occurred during the current tick.
      * Cleared at the start of each tick. Used by the frontend for visual feedback.
      */
-    private final List<FoodPickupEvent> foodPickupEvents = new ArrayList<>();
-
-    /** Evolution option events emitted during the current tick. */
-    private final List<EvolutionOptionsEvent> evolutionOptionsEvents = new ArrayList<>();
-
-    /** Death events emitted during the current tick. */
-    private final List<DeathEvent> deathEvents = new ArrayList<>();
-
-    /** Dash events emitted during the current tick (for client visual effects). */
-    private final List<DashEvent> dashEvents = new ArrayList<>();
+    private final WorldEventBuffer events = new WorldEventBuffer();
+    private final MovementSystem movementSystem = new MovementSystem();
+    private final WaterSystem waterSystem = new WaterSystem();
+    private final HealthRegenerationSystem healthRegenerationSystem = new HealthRegenerationSystem();
+    private final FoodCollisionSystem foodCollisionSystem = new FoodCollisionSystem();
+    private final EvolutionSystem evolutionSystem = new EvolutionSystem();
+    private final PredationSystem predationSystem = new PredationSystem();
 
     /**
      * Player IDs queued for a forced kill from outside the tick thread
@@ -60,7 +57,7 @@ public class GameWorld {
      * death event is broadcast in the same tick, avoiding a race with the
      * per-tick event clear.
      */
-    private final java.util.Queue<String> pendingForceKills = new java.util.concurrent.ConcurrentLinkedQueue<>();
+    private final GameCommandQueue commandQueue = new GameCommandQueue();
 
     /** Spatial grid for efficient collision and visibility queries. */
     private final SpatialGrid spatialGrid;
@@ -144,62 +141,37 @@ public class GameWorld {
     public void tick(double deltaTime) {
         tick++;
 
-        // Clear events from previous tick
-        foodPickupEvents.clear();
-        evolutionOptionsEvents.clear();
-        deathEvents.clear();
-        dashEvents.clear();
+        // Clear the prior tick before commands: force-kill commands emit death
+        // events that must survive through this tick's broadcast.
+        events.clear();
 
-        // Drain any externally-requested forced kills (test support) so their
-        // death events are emitted within this tick's event window.
-        drainForceKills();
+        // All externally requested world mutations happen here, on the
+        // authoritative loop thread, before simulation observes world state.
+        commandQueue.drain(this);
 
-        // 1. Process player inputs and apply movement
-        for (PlayerEntity player : players.values()) {
-            if (!player.isAlive()) continue;
-
-            // Re-apply the last steering input on ticks that carry no fresh
-            // packet: client input runs on its own ~20 Hz timer and drifts
-            // against the tick, so moving only on packet-carrying ticks made
-            // the creature stall and surge instead of holding a steady speed.
-            InputMessage input = player.resolveMovementInput();
-            if (input != null) {
-                if (input.dash() && player.canDash(tick)) {
-                    player.markDashUsed(tick);
-                    dashEvents.add(new DashEvent(
-                            player.getId(), player.getX(), player.getY(), input.angle()));
-                }
-
-                double dashMultiplier = 1.0;
-                if (player.isDashing()) {
-                    dashMultiplier = DASH_SPEED_MULTIPLIER;
-                    player.advanceDash();
-                }
-
-                double biomeMultiplier = movementMultiplierFor(player.getAnimal(), biomeAt(player.getX(), player.getY()));
-                player.applyMovement(input, deltaTime, width, height, dashMultiplier * biomeMultiplier);
-            }
-        }
+        movementSystem.update(players.values(), deltaTime, width, height, tick,
+                p -> movementMultiplierFor(p.getAnimal(), biomeAt(p.getX(), p.getY())), events);
 
         // 2. Update every creature's drinking-water bar (refill in water,
         // dehydrate when empty on land).
-        checkWater(deltaTime);
+        waterSystem.update(players.values(), playerSpawnMs,
+                p -> isInWaterSource(p.getX(), p.getY()), deltaTime, events);
 
         // 2b. Passively regenerate health for creatures that have avoided
         // damage long enough.
-        regenerateHealth(deltaTime);
+        healthRegenerationSystem.update(players.values(), deltaTime);
 
         // 3. Rebuild spatial grid with current entity positions for collision queries.
         rebuildSpatialGrid();
 
         // 3. Check food collisions using spatial grid — award XP, remove collected food
-        checkFoodCollisionsSpatial();
+        foodCollisionSystem.update(players.values(), foods, spatialGrid, events);
 
         // 4. Resolve player-vs-player predation.
-        checkPlayerPredation(deltaTime);
+        predationSystem.update(deltaTime, this::checkPlayerPredation);
 
         // 5. Send evolution options once a player has enough XP for the next tier.
-        checkEvolutionOptions();
+        evolutionSystem.update(players.values(), events);
 
         // 4. Replenish consumed food. Uneaten food is never removed merely
         // because of its age, so it cannot vanish while a player approaches.
@@ -233,48 +205,6 @@ public class GameWorld {
         }
     }
 
-    /**
-     * Update every creature's drinking-water bar. Standing in a water source
-     * refills it; when empty on land the creature dehydrates and loses health.
-     * A death from dehydration emits a death event.
-     */
-    private void checkWater(double deltaTime) {
-        for (PlayerEntity player : players.values()) {
-            if (!player.isAlive()) {
-                continue;
-            }
-
-            player.updateWater(isInWaterSource(player.getX(), player.getY()), deltaTime);
-
-            if (!player.isAlive()) {
-                long spawnedAt = playerSpawnMs.getOrDefault(player.getId(), System.currentTimeMillis());
-                deathEvents.add(new DeathEvent(
-                        player.getId(),
-                        null,
-                        null,
-                        DeathEvent.REASON_DEHYDRATION,
-                        player.getX(),
-                        player.getY(),
-                        0.0,
-                        Math.max(0, System.currentTimeMillis() - spawnedAt)
-                ));
-            }
-        }
-    }
-
-    /**
-     * Passively regenerate every alive creature's health. A creature only
-     * heals once it has gone long enough without taking damage; the timing is
-     * owned by {@link PlayerEntity#regenerateHealth(double)}.
-     */
-    private void regenerateHealth(double deltaTime) {
-        for (PlayerEntity player : players.values()) {
-            if (player.isAlive()) {
-                player.regenerateHealth(deltaTime);
-            }
-        }
-    }
-
 
     /**
      * Get the spatial grid (for testing and metrics).
@@ -303,97 +233,6 @@ public class GameWorld {
      */
     public SpatialGrid.NearbyQueryResult getVisibleEntities(String playerId) {
         return getVisibleEntities(playerId, DEFAULT_VIEW_RADIUS);
-    }
-
-    /**
-     * Returns debug info for all grid cells (for frontend visualization).
-     */
-    public List<SnapshotMessage.GridCellDebug> getGridDebugInfo() {
-        return spatialGrid.getAllCellsDebug();
-    }
-
-    // ------------------------------------------------------------------ food collision
-
-    /**
-     * Check every alive player against nearby food items for overlap using the spatial grid.
-     * If a player overlaps a food item and meets the tier requirement,
-     * the food is consumed: XP is awarded and the food is removed.
-     * <p>
-     * Uses the spatial grid for O(1) nearby queries instead of O(n) brute force.
-     */
-    private void checkFoodCollisionsSpatial() {
-        if (foods.isEmpty()) return;
-
-        // Collect food IDs to remove (avoid ConcurrentModificationException)
-        List<String> consumedIds = new ArrayList<>();
-
-        for (PlayerEntity player : players.values()) {
-            if (!player.isAlive()) continue;
-
-            double px = player.getX();
-            double py = player.getY();
-            double pr = player.getRadius();
-            int playerTier = player.getAnimal().tier();
-
-            // Query nearby food using spatial grid instead of iterating all food
-            List<FoodEntity> nearbyFood = spatialGrid.queryFoods(px, py, pr + 50);
-
-            for (FoodEntity food : nearbyFood) {
-                // Skip if already consumed this tick
-                if (consumedIds.contains(food.getInstanceId())) continue;
-
-                // Check tier requirement
-                if (!food.getDefinition().canBeEatenByTier(playerTier)) continue;
-
-                // Circle-circle collision
-                double dx = px - food.getX();
-                double dy = py - food.getY();
-                double distSq = dx * dx + dy * dy;
-                double touchDist = pr + food.getRadius();
-
-                if (distSq <= touchDist * touchDist) {
-                    // Collision! Award XP and mark for removal
-                    player.addXp(food.getXp());
-                    // Eating also tops up the creature's drinking water.
-                    player.refillWaterOnFood();
-
-                    consumedIds.add(food.getInstanceId());
-
-                    // Record pickup event for visual feedback
-                    foodPickupEvents.add(new FoodPickupEvent(
-                            food.getInstanceId(),
-                            food.getFoodId(),
-                            food.getX(),
-                            food.getY(),
-                            food.getXp(),
-                            player.getId()
-                    ));
-
-                    log.debug("Player {} ate {} (+{}xp, total={}xp)",
-                            player.getNickname(), food.getFoodId(), food.getXp(), player.getXp());
-                }
-            }
-        }
-
-        // Remove consumed food
-        for (String id : consumedIds) {
-            foods.remove(id);
-        }
-    }
-
-    private void checkEvolutionOptions() {
-        for (PlayerEntity player : players.values()) {
-            if (!player.isAlive() || !player.shouldSendEvolutionOptions()) {
-                continue;
-            }
-
-            List<EvolutionOptionsMessage.EvolutionOption> options = player.getAvailableEvolutionOptions().stream()
-                    .map(a -> new EvolutionOptionsMessage.EvolutionOption(a.id(), a.name(), a.tier()))
-                    .toList();
-
-            evolutionOptionsEvents.add(new EvolutionOptionsEvent(player.getId(), options));
-            player.markEvolutionOptionsSent();
-        }
     }
 
     private void checkPlayerPredation(double deltaTime) {
@@ -469,7 +308,7 @@ public class GameWorld {
         target.kill();
         clearBiteCooldownsForPlayer(target.getId());
         long spawnedAt = playerSpawnMs.getOrDefault(target.getId(), System.currentTimeMillis());
-        deathEvents.add(new DeathEvent(
+        events.deaths.add(new DeathEvent(
                 target.getId(),
                 attacker.getId(),
                 attacker.getNickname(),
@@ -620,11 +459,12 @@ public class GameWorld {
     /**
      * Queue an input for a player. Called from the WebSocket handler thread.
      */
-    public void queueInput(String playerId, InputMessage input) {
+    public boolean queueInput(String playerId, InputMessage input) {
         PlayerEntity player = players.get(playerId);
         if (player != null && player.isAlive()) {
-            player.queueInput(input);
+            return player.queueInput(input);
         }
+        return false;
     }
 
     public PlayerEntity getPlayer(String playerId) {
@@ -661,22 +501,22 @@ public class GameWorld {
      * Used to broadcast visual feedback to clients.
      */
     public List<FoodPickupEvent> getFoodPickupEvents() {
-        return Collections.unmodifiableList(foodPickupEvents);
+        return events.foodPickups();
     }
 
     /**
      * Get the evolution option events from the current tick.
      */
     public List<EvolutionOptionsEvent> getEvolutionOptionsEvents() {
-        return Collections.unmodifiableList(evolutionOptionsEvents);
+        return events.evolutionOptions();
     }
 
     public List<DeathEvent> getDeathEvents() {
-        return Collections.unmodifiableList(deathEvents);
+        return events.deaths();
     }
 
     public List<DashEvent> getDashEvents() {
-        return Collections.unmodifiableList(dashEvents);
+        return events.dashes();
     }
 
     /**
@@ -690,74 +530,23 @@ public class GameWorld {
      *
      * @return {@code true} if the player currently exists and is alive
      */
-    public boolean forceKill(String playerId) {
+    boolean forceKillNow(String playerId) {
         PlayerEntity victim = players.get(playerId);
         if (victim == null || !victim.isAlive()) {
             return false;
         }
-        pendingForceKills.add(playerId);
+        victim.kill();
+        clearBiteCooldownsForPlayer(playerId);
+        long spawnedAt = playerSpawnMs.getOrDefault(playerId, System.currentTimeMillis());
+        events.deaths.add(new DeathEvent(
+                playerId, null, "Test", DeathEvent.REASON_EATEN,
+                victim.getX(), victim.getY(), 0.0,
+                Math.max(0, System.currentTimeMillis() - spawnedAt)));
         return true;
     }
 
-    /** Apply any queued forced kills, emitting death events for each. */
-    private void drainForceKills() {
-        String playerId;
-        while ((playerId = pendingForceKills.poll()) != null) {
-            PlayerEntity victim = players.get(playerId);
-            if (victim == null || !victim.isAlive()) {
-                continue;
-            }
-            victim.kill();
-            clearBiteCooldownsForPlayer(playerId);
-            long spawnedAt = playerSpawnMs.getOrDefault(playerId, System.currentTimeMillis());
-            deathEvents.add(new DeathEvent(
-                    playerId,
-                    null,
-                    "Test",
-                    DeathEvent.REASON_EATEN,
-                    victim.getX(),
-                    victim.getY(),
-                    0.0,
-                    Math.max(0, System.currentTimeMillis() - spawnedAt)
-            ));
-        }
-    }
-
-    /**
-     * Debug helper: instantly level the player up to the next tier so testers
-     * can quickly walk through the evolution chain. Grants enough XP to satisfy
-     * the next evolution option's requirement, then evolves into it. Picks the
-     * first available option for the next tier (matching the player's biome when
-     * possible).
-     */
-    public EvolutionResult debugLevelUp(String playerId) {
-        PlayerEntity player = players.get(playerId);
-        if (player == null || !player.isAlive()) {
-            return EvolutionResult.failure("Player is not alive.");
-        }
-
-        AnimalDefinition current = player.getAnimal();
-        List<AnimalDefinition> options = current.evolutionOptions();
-        if (options.isEmpty()) {
-            // Already at the top of the normal chain; try the final form.
-            AnimalDefinition finalForm = AnimalDefinition.byId("blackdragon");
-            if (finalForm == null || player.getAnimal().biome() == Biome.FINAL) {
-                return EvolutionResult.failure("Already at the maximum tier.");
-            }
-            player.addXp(Math.max(0, finalForm.xpRequired() - player.getXp()));
-            if (!player.canEvolveTo(finalForm)) {
-                return EvolutionResult.failure("Final evolution is not available for this animal.");
-            }
-            return evolvePlayer(playerId, finalForm.id());
-        }
-
-        AnimalDefinition target = options.stream()
-                .filter(a -> a.biome() == current.biome())
-                .findFirst()
-                .orElse(options.get(0));
-
-        player.addXp(Math.max(0, target.xpRequired() - player.getXp()));
-        return evolvePlayer(playerId, target.id());
+    void submit(GameCommand command) {
+        commandQueue.submit(command);
     }
 
     public EvolutionResult evolvePlayer(String playerId, String animalId) {

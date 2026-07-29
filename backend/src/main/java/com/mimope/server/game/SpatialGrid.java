@@ -201,36 +201,6 @@ public class SpatialGrid {
         return rows;
     }
 
-    /**
-     * Return debug information for all non-empty cells.
-     * <p>
-     * The frontend uses this to draw the Phase 11 spatial-grid overlay when
-     * debug mode is enabled. Empty cells are omitted to keep snapshots small.
-     */
-    public List<com.mimope.server.protocol.outbound.SnapshotMessage.GridCellDebug> getAllCellsDebug() {
-        List<com.mimope.server.protocol.outbound.SnapshotMessage.GridCellDebug> result = new ArrayList<>();
-
-        for (int row = 0; row < rows; row++) {
-            for (int col = 0; col < cols; col++) {
-                Cell cell = cells.get(row * cols + col);
-                if (cell.players.isEmpty() && cell.foods.isEmpty()) {
-                    continue;
-                }
-
-                result.add(new com.mimope.server.protocol.outbound.SnapshotMessage.GridCellDebug(
-                        col * cellSize,
-                        row * cellSize,
-                        Math.min(cellSize, worldWidth - col * cellSize),
-                        Math.min(cellSize, worldHeight - row * cellSize),
-                        cell.players.size(),
-                        cell.foods.size()
-                ));
-            }
-        }
-
-        return result;
-    }
-
     /** Simple holder for query results. */
     public record NearbyQueryResult(
             List<PlayerEntity> players,

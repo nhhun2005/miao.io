@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { EvolutionOption, GridCellDebug } from "../network/protocol";
+import type { EvolutionOption } from "../network/protocol";
 
 /** Minimal player data received in snapshots. */
 export interface PlayerSnapshot {
@@ -37,10 +37,6 @@ export interface GameState {
   leaderboard: { nickname: string; xp: number }[];
   /** Server tick timestamp of the last snapshot. */
   lastSnapshotTick: number;
-  /** Spatial grid debug data (only present when enabled). */
-  gridDebug: GridCellDebug[] | null;
-  /** Whether grid debug overlay is enabled. */
-  showGridDebug: boolean;
   /** Evolution options currently available to the local player. */
   evolutionOptions: EvolutionOption[];
 
@@ -50,9 +46,7 @@ export interface GameState {
     foods: FoodSnapshot[],
     leaderboard: { nickname: string; xp: number }[],
     tick: number,
-    gridDebug?: GridCellDebug[],
   ) => void;
-  setShowGridDebug: (show: boolean) => void;
   setEvolutionOptions: (options: EvolutionOption[]) => void;
   clearEvolutionOptions: () => void;
   reset: () => void;
@@ -64,8 +58,6 @@ const initialState = {
   foods: {} as Record<string, FoodSnapshot>,
   leaderboard: [] as { nickname: string; xp: number }[],
   lastSnapshotTick: 0,
-  gridDebug: null as GridCellDebug[] | null,
-  showGridDebug: false,
   evolutionOptions: [] as EvolutionOption[],
 };
 
@@ -74,16 +66,13 @@ export const useGameStore = create<GameState>((set) => ({
 
   setLocalPlayerId: (id) => set({ localPlayerId: id }),
 
-  updateSnapshot: (players, foods, leaderboard, tick, gridDebug) =>
+  updateSnapshot: (players, foods, leaderboard, tick) =>
     set({
       players: Object.fromEntries(players.map((p) => [p.id, p])),
       foods: Object.fromEntries(foods.map((f) => [f.id, f])),
       leaderboard,
       lastSnapshotTick: tick,
-      gridDebug: gridDebug ?? null,
     }),
-
-  setShowGridDebug: (show) => set({ showGridDebug: show }),
 
   setEvolutionOptions: (options) => set({ evolutionOptions: options }),
 

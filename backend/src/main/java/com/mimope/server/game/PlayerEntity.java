@@ -84,6 +84,7 @@ public class PlayerEntity {
 
     // Latest queued input (set by the WebSocket handler, consumed by the tick)
     private volatile InputMessage pendingInput;
+    private int lastAcceptedInputSequence = Integer.MIN_VALUE;
 
     /**
      * The most recently applied steering input, retained after it is consumed.
@@ -145,14 +146,19 @@ public class PlayerEntity {
      * Queue an input message. Only the most recent input is kept;
      * older unprocessed inputs are discarded (latest-wins strategy).
      */
-    public void queueInput(InputMessage input) {
+    public synchronized boolean queueInput(InputMessage input) {
+        if (input == null || input.seq() <= lastAcceptedInputSequence) {
+            return false;
+        }
+        lastAcceptedInputSequence = input.seq();
         this.pendingInput = input;
+        return true;
     }
 
     /**
      * Consume and clear the pending input. Returns {@code null} if none.
      */
-    public InputMessage consumeInput() {
+    public synchronized InputMessage consumeInput() {
         InputMessage input = this.pendingInput;
         this.pendingInput = null;
         return input;
@@ -198,11 +204,11 @@ public class PlayerEntity {
                               double worldHeight,
                               double speedMultiplier) {
         double speed = animal.speed();
-        double intensity = input.intensity();
+        double intensity = Math.max(0.0, Math.min(1.0, input.intensity()));
 
         speed *= speedMultiplier;
 
-        double moveAngle = input.angle();
+        double moveAngle = Double.isFinite(input.angle()) ? input.angle() : 0.0;
         double dx = Math.cos(moveAngle) * speed * intensity * deltaTime;
         double dy = Math.sin(moveAngle) * speed * intensity * deltaTime;
 
@@ -217,8 +223,10 @@ public class PlayerEntity {
     }
 
     public void setPosition(double x, double y) {
-        this.x = x;
-        this.y = y;
+        if (Double.isFinite(x) && Double.isFinite(y)) {
+            this.x = x;
+            this.y = y;
+        }
     }
 
     /**
@@ -275,7 +283,9 @@ public class PlayerEntity {
     }
 
     public void setAngle(double angle) {
-        this.angle = angle;
+        if (Double.isFinite(angle)) {
+            this.angle = Math.atan2(Math.sin(angle), Math.cos(angle));
+        }
     }
 
     // ------------------------------------------------------------------ state changes

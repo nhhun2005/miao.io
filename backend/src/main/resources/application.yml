@@ -16,6 +16,8 @@ management:
         enabled: true
 
 game:
+  websocket:
+    allowed-origin-patterns: ${GAME_WEBSOCKET_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*}
   world:
     width: 5000
     height: 5000

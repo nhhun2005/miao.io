@@ -26,8 +26,7 @@ public record SnapshotMessage(
         List<LeaderboardEntry> leaderboard,
         List<FoodPickupData> foodPickups,
         List<KillEventData> killEvents,
-        List<DashEventData> dashEvents,
-        List<GridCellDebug> gridDebug
+        List<DashEventData> dashEvents
 ) {
 
     public static final String TYPE = ProtocolConstants.TYPE_SNAPSHOT;
@@ -156,27 +155,6 @@ public record SnapshotMessage(
         }
     }
 
-    /** Grid cell debug info for spatial-grid visualization on the frontend. */
-    public record GridCellDebug(
-            double x,
-            double y,
-            double w,
-            double h,
-            int playerCount,
-            int foodCount
-    ) {
-        public Map<String, Object> toMap() {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("x", x);
-            m.put("y", y);
-            m.put("w", w);
-            m.put("h", h);
-            m.put("playerCount", playerCount);
-            m.put("foodCount", foodCount);
-            return m;
-        }
-    }
-
     /** Convert to a field map suitable for {@link com.mimope.server.websocket.MessageEncoder}. */
     public Map<String, Object> toMap() {
         Map<String, Object> map = new LinkedHashMap<>();
@@ -192,9 +170,6 @@ public record SnapshotMessage(
         }
         if (dashEvents != null && !dashEvents.isEmpty()) {
             map.put("dashEvents", dashEvents.stream().map(DashEventData::toMap).toList());
-        }
-        if (gridDebug != null && !gridDebug.isEmpty()) {
-            map.put("gridDebug", gridDebug.stream().map(GridCellDebug::toMap).toList());
         }
         return map;
     }

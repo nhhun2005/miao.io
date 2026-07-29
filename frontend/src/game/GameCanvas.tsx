@@ -12,11 +12,9 @@ import type { GameConnection } from '../network/GameConnection';
 export interface GameCanvasProps {
   /** The active game connection (from LoadingScreen). */
   connection: GameConnection;
-  /** Whether to show the spatial grid debug overlay. */
-  showGridDebug?: boolean;
 }
 
-export function GameCanvas({ connection, showGridDebug = false }: GameCanvasProps) {
+export function GameCanvas({ connection }: GameCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<PixiGame | null>(null);
   const [loading, setLoading] = useState(true);
@@ -29,7 +27,7 @@ export function GameCanvas({ connection, showGridDebug = false }: GameCanvasProp
     // Prevent double-init in React StrictMode
     if (gameRef.current) return;
 
-    const game = new PixiGame({ container, connection, showGridDebug });
+    const game = new PixiGame({ container, connection });
     gameRef.current = game;
 
     // Wire snapshot callback from GameConnection into PixiGame
@@ -54,10 +52,6 @@ export function GameCanvas({ connection, showGridDebug = false }: GameCanvasProp
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
-
-  useEffect(() => {
-    connection.sendGridDebugToggle(showGridDebug);
-  }, [connection, showGridDebug]);
 
   return (
     <div className="game-canvas-wrapper">

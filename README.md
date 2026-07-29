@@ -29,6 +29,8 @@ Install frontend dependencies:
 make frontend-install
 ```
 
+The frontend uses the committed lockfile and `npm ci` for reproducible clean installs.
+
 Run the frontend:
 
 ```sh
@@ -66,11 +68,25 @@ Run a production-style full stack with the frontend nginx WebSocket proxy:
 docker compose -f docker-compose.prod.yml up --build
 ```
 
+WebSocket origins default to local development only. For deployment, set the
+comma-separated public frontend allowlist, for example:
+
+```sh
+GAME_WEBSOCKET_ALLOWED_ORIGIN_PATTERNS=https://game.example.com docker compose -f docker-compose.prod.yml up --build
+```
+
+Copy `.env.example` for local configuration and never use a global `*` in production.
+
 Run the fake-client WebSocket load test against a running backend:
 
 ```sh
 node scripts/load-test.mjs
 ```
+
+Configure it with `MIMOPE_WS_URL`, `MIMOPE_CLIENTS`, `MIMOPE_DURATION_MS`,
+`MIMOPE_INPUT_INTERVAL_MS`, `MIMOPE_JOIN_TIMEOUT_MS`, and
+`MIMOPE_ALLOWED_ERRORS`. `scripts/load-test-scenarios.sh` defines the
+10/25/50-client validation sequence.
 
 Verify a from-scratch build and test run (frontend build/test/lint + backend
 package/test) against a clean copy of the working tree:

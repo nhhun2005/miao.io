@@ -1,6 +1,7 @@
 package com.mimope.server.websocket;
 
 import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
@@ -13,17 +14,20 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
  */
 @Configuration
 @EnableWebSocket
+@EnableConfigurationProperties(WebSocketProperties.class)
 public class WebSocketConfig implements WebSocketConfigurer {
 
     private final GameWebSocketHandler gameWebSocketHandler;
+    private final WebSocketProperties properties;
 
-    public WebSocketConfig(GameWebSocketHandler gameWebSocketHandler) {
+    public WebSocketConfig(GameWebSocketHandler gameWebSocketHandler, WebSocketProperties properties) {
         this.gameWebSocketHandler = gameWebSocketHandler;
+        this.properties = properties;
     }
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(gameWebSocketHandler, "/ws/game")
-                .setAllowedOrigins("*");
+                .setAllowedOriginPatterns(properties.allowedOriginPatterns().toArray(String[]::new));
     }
 }

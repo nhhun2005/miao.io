@@ -6,7 +6,6 @@ import {
   createJoinMessage,
   createInputMessage,
   createEvolveMessage,
-  createGridDebugMessage,
   createPingMessage,
   parseServerMessage,
 } from './protocol';
@@ -25,7 +24,6 @@ describe('Protocol constants', () => {
     expect(ClientMessageType.INPUT).toBe('input');
     expect(ClientMessageType.EVOLVE).toBe('evolve');
     expect(ClientMessageType.PING).toBe('ping');
-    expect(ClientMessageType.GRID_DEBUG).toBe('grid_debug');
   });
 
   it('defines all server message types', () => {
@@ -90,14 +88,6 @@ describe('createPingMessage', () => {
     expect(msg.type).toBe('ping');
     expect(msg.timestamp).toBeGreaterThanOrEqual(before);
     expect(msg.timestamp).toBeLessThanOrEqual(after);
-  });
-});
-
-describe('createGridDebugMessage', () => {
-  it('creates a grid debug toggle message', () => {
-    const msg = createGridDebugMessage(true);
-    expect(msg.type).toBe('grid_debug');
-    expect(msg.enabled).toBe(true);
   });
 });
 
@@ -325,7 +315,6 @@ describe('parseServerMessage', () => {
       createInputMessage(1, 0.5, 1.0, false, false),
       createEvolveMessage('fox'),
       createPingMessage(),
-      createGridDebugMessage(false),
     ];
 
     for (const msg of messages) {

@@ -5,7 +5,6 @@ import com.mimope.server.game.GameWorld;
 import com.mimope.server.game.PlayerEntity;
 import com.mimope.server.protocol.ProtocolConstants;
 import com.mimope.server.protocol.inbound.EvolveMessage;
-import com.mimope.server.protocol.inbound.GridDebugMessage;
 import com.mimope.server.protocol.inbound.InputMessage;
 import com.mimope.server.protocol.inbound.JoinMessage;
 import com.mimope.server.protocol.inbound.PingMessage;
@@ -119,8 +118,6 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             case ProtocolConstants.TYPE_INPUT  -> handleInput(clientSession, msg);
             case ProtocolConstants.TYPE_EVOLVE -> handleEvolve(clientSession, msg);
             case ProtocolConstants.TYPE_PING   -> handlePing(clientSession, msg);
-            case ProtocolConstants.TYPE_GRID_DEBUG -> handleGridDebug(clientSession, msg);
-            case ProtocolConstants.TYPE_DEBUG_LEVEL_UP -> handleDebugLevelUp(clientSession, msg);
             default                            -> handleUnknown(clientSession, msg);
 
         }
@@ -145,7 +142,13 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         String nickname = validNickname.get();
 
         // Spawn the player in the game world
-        PlayerEntity player = gameRoom.addPlayer(session.getId(), nickname, join.starterAnimalId());
+        PlayerEntity player;
+        try {
+            player = gameRoom.addPlayer(session.getId(), nickname, join.starterAnimalId());
+        } catch (GameRoom.GameCommandTimeoutException ex) {
+            sendError(session, "Game server timed out while joining.");
+            return;
+        }
         if (player == null) {
             log.warn("Join rejected – room full for session {}", session.getId());
             sendError(session, "Room is full. Please try again later.");
@@ -169,7 +172,9 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         }
 
         // Queue the input for the game loop to process on the next tick
-        gameRoom.queueInput(session.getId(), input);
+        if (!gameRoom.queueInput(session.getId(), input)) {
+            log.trace("Ignored stale input from {}: seq={}", session.getId(), input.seq());
+        }
 
         log.trace("Input from {}: seq={}, angle={}, dash={}",
                 session.getId(), input.seq(), input.angle(), input.dash());
@@ -182,7 +187,13 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        GameWorld.EvolutionResult result = gameRoom.getWorld().evolvePlayer(session.getId(), evolve.animalId());
+        GameWorld.EvolutionResult result;
+        try {
+            result = gameRoom.evolvePlayer(session.getId(), evolve.animalId());
+        } catch (GameRoom.GameCommandTimeoutException ex) {
+            sendError(session, "Game server timed out while evolving.");
+            return;
+        }
         if (!result.success()) {
             sendError(session, result.error());
             return;
@@ -197,28 +208,6 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         PingMessage ping = PingMessage.from(msg);
         PongMessage pong = new PongMessage(ping.timestamp());
         messageEncoder.send(session, PongMessage.TYPE, pong.toMap());
-    }
-
-    private void handleGridDebug(ClientSession session, InboundMessage msg) {
-        GridDebugMessage gridDebug = GridDebugMessage.from(msg);
-        if (gridDebug == null) {
-            sendError(session, "Malformed grid_debug message: missing enabled.");
-            return;
-        }
-
-        gameRoom.setGridDebugEnabled(gridDebug.enabled());
-        log.debug("Grid debug {} by session {}", gridDebug.enabled() ? "enabled" : "disabled", session.getId());
-    }
-
-    private void handleDebugLevelUp(ClientSession session, InboundMessage msg) {
-        GameWorld.EvolutionResult result = gameRoom.getWorld().debugLevelUp(session.getId());
-        if (!result.success()) {
-            sendError(session, result.error());
-            return;
-        }
-
-        log.info("Debug level-up: session={}, animalId='{}'",
-                session.getId(), result.player().getAnimal().id());
     }
 
     private void handleUnknown(ClientSession session, InboundMessage msg) {

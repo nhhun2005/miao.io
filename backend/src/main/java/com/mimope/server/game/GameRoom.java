@@ -20,6 +20,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Orchestrates a single game room: owns the {@link GameWorld} and
@@ -46,7 +49,7 @@ public class GameRoom {
 
     private GameWorld world;
     private GameLoop loop;
-    private volatile boolean gridDebugEnabled = false;
+    private static final long COMMAND_TIMEOUT_MS = 2_000;
 
     public GameRoom(SessionRegistry sessionRegistry,
                     MessageEncoder messageEncoder,
@@ -103,18 +106,16 @@ public class GameRoom {
     }
 
     public PlayerEntity addPlayer(String playerId, String nickname, String starterAnimalId) {
-        if (world.getPlayerCount() >= maxPlayers) {
-            log.warn("Room full ({}/{}), rejecting player '{}'", world.getPlayerCount(), maxPlayers, nickname);
-            return null;
-        }
-        return world.spawnPlayer(playerId, nickname, starterAnimalId);
+        CompletableFuture<PlayerEntity> result = new CompletableFuture<>();
+        world.submit(new GameCommand.Join(playerId, nickname, starterAnimalId, maxPlayers, result));
+        return await(result, "join");
     }
 
     /**
      * Remove a player from the game world (disconnect or death cleanup).
      */
     public void removePlayer(String playerId) {
-        world.removePlayer(playerId);
+        world.submit(new GameCommand.Remove(playerId));
     }
 
     /**
@@ -122,14 +123,28 @@ public class GameRoom {
      * client receives a death message on the next snapshot broadcast.
      */
     public boolean forceKill(String playerId) {
-        return world.forceKill(playerId);
+        CompletableFuture<Boolean> result = new CompletableFuture<>();
+        world.submit(new GameCommand.ForceKill(playerId, result));
+        return Boolean.TRUE.equals(await(result, "force-kill"));
+    }
+
+    public Double grantXp(String playerId, double amount) {
+        CompletableFuture<Double> result = new CompletableFuture<>();
+        world.submit(new GameCommand.GrantXp(playerId, amount, result));
+        return await(result, "grant-xp");
+    }
+
+    public GameWorld.EvolutionResult evolvePlayer(String playerId, String animalId) {
+        CompletableFuture<GameWorld.EvolutionResult> result = new CompletableFuture<>();
+        world.submit(new GameCommand.Evolve(playerId, animalId, result));
+        return await(result, "evolve");
     }
 
     /**
      * Queue a player input for processing on the next tick.
      */
-    public void queueInput(String playerId, InputMessage input) {
-        world.queueInput(playerId, input);
+    public boolean queueInput(String playerId, InputMessage input) {
+        return world.queueInput(playerId, input);
     }
 
     /**
@@ -229,10 +244,6 @@ public class GameRoom {
                     ))
                     .toList();
 
-            List<SnapshotMessage.GridCellDebug> gridDebug = gridDebugEnabled
-                    ? world.getGridDebugInfo()
-                    : null;
-
             SnapshotMessage snapshot = new SnapshotMessage(
                     world.getTick(),
                     playerDataList,
@@ -240,8 +251,7 @@ public class GameRoom {
                     leaderboard,
                     foodPickups,
                     killEvents,
-                    dashEvents,
-                    gridDebug);
+                    dashEvents);
 
             // Measure snapshot size reduction
             int filteredSize = estimateJsonSize(snapshot.toMap());
@@ -363,7 +373,7 @@ public class GameRoom {
                         f.getInstanceId(), f.getFoodId(), f.getX(), f.getY()))
                 .toList();
         SnapshotMessage unfiltered = new SnapshotMessage(
-                world.getTick(), allPlayers, allFood, leaderboard, foodPickups, null, null, null);
+                world.getTick(), allPlayers, allFood, leaderboard, foodPickups, null, null);
         return estimateJsonSize(unfiltered.toMap());
     }
 
@@ -381,11 +391,22 @@ public class GameRoom {
         return maxPlayers;
     }
 
-    public boolean isGridDebugEnabled() {
-        return gridDebugEnabled;
+    private <T> T await(CompletableFuture<T> future, String operation) {
+        try {
+            return future.get(COMMAND_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            throw new GameCommandTimeoutException(operation + " timed out after " + COMMAND_TIMEOUT_MS + "ms", e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new GameCommandTimeoutException(operation + " was interrupted", e);
+        } catch (java.util.concurrent.ExecutionException e) {
+            throw new IllegalStateException(operation + " command failed", e.getCause());
+        }
     }
 
-    public void setGridDebugEnabled(boolean gridDebugEnabled) {
-        this.gridDebugEnabled = gridDebugEnabled;
+    public static final class GameCommandTimeoutException extends RuntimeException {
+        public GameCommandTimeoutException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 }

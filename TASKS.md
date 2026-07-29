@@ -236,7 +236,6 @@ Recommended default decisions:
 - [x] Filter snapshots by viewport radius.
 - [x] Add tests for spatial grid queries.
 - [x] Measure snapshot size reduction.
-- [x] Add debug visualization option on frontend.
 
 ---
 

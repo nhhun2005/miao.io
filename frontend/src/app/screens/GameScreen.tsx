@@ -46,7 +46,6 @@ export function GameScreen() {
     };
   }, [connection]);
 
-  const [showGridDebug, setShowGridDebug] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [latency, setLatency] = useState(0);
@@ -87,7 +86,7 @@ export function GameScreen() {
   return (
     <div className="screen screen--game">
       {/* PixiJS canvas fills the screen */}
-      <GameCanvas connection={connection} showGridDebug={showGridDebug} />
+      <GameCanvas connection={connection} />
 
       {/* HUD overlay — player info */}
       <div className="game-overlay game-overlay--top-left">
@@ -204,26 +203,7 @@ export function GameScreen() {
               {focused ? '✅' : '⏸ paused'}
             </span>
           </div>
-          <button
-            type="button"
-            className="game-debug-panel__levelup"
-            onClick={() => connection.sendDebugLevelUp()}
-            title="Instantly evolve to the next tier"
-          >
-            ⬆️ Instant Level Up
-          </button>
         </details>
-      </div>
-
-      {/* Grid debug toggle */}
-      <div className="game-overlay game-overlay--bottom-left">
-        <button
-          className={`grid-debug-toggle ${showGridDebug ? 'grid-debug-toggle--active' : ''}`}
-          onClick={() => setShowGridDebug((v) => !v)}
-          title="Toggle spatial grid debug visualization"
-        >
-          {showGridDebug ? '📊 Grid: ON' : '📊 Grid: OFF'}
-        </button>
       </div>
 
       <Modal open={evolutionOptions.length > 0}>

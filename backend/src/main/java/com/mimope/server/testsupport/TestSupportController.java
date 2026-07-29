@@ -48,9 +48,12 @@ public class TestSupportController {
             @RequestParam double amount) {
         return byNickname(nickname)
                 .map(p -> {
-                    p.addXp(amount);
+                    Double xp = gameRoom.grantXp(p.getId(), amount);
+                    if (xp == null) {
+                        return ResponseEntity.notFound().<Map<String, Object>>build();
+                    }
                     return ResponseEntity.ok(Map.<String, Object>of(
-                            "nickname", nickname, "xp", p.getXp()));
+                            "nickname", nickname, "xp", xp));
                 })
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }

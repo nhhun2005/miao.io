@@ -4,6 +4,7 @@ services:
       context: ./backend
     environment:
       SPRING_PROFILES_ACTIVE: prod
+      GAME_WEBSOCKET_ALLOWED_ORIGIN_PATTERNS: ${GAME_WEBSOCKET_ALLOWED_ORIGIN_PATTERNS:-http://localhost:*}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
       interval: 30s

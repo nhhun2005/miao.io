@@ -8,7 +8,7 @@
 - Land, ocean, and arctic biome visuals with biome-aware food spawning and movement modifiers.
 - Dash on left click (or Space/W) with a 1.5-second cooldown, a 5% drinking-water cost per dash (blocked below 10% water), and HUD state. Holding the control re-dashes automatically on every cooldown.
 - Drinking-water bar drains at 2% per second on dry land, but sea animals stranded out of water lose 25% per second and run dry in four seconds.
-- Leaderboard, minimap, health bar, XP bar, ping display, settings placeholder, and debug overlays.
+- Leaderboard, minimap, health bar, XP bar, ping display, settings placeholder, and input/FPS development diagnostics.
 
 ## Verification
 
@@ -20,5 +20,5 @@
 ## Known Follow-ups
 
 - Balance animal speeds, XP thresholds, and predation rewards after real playtesting.
-- Add production observability and stricter origin rules before public deployment.
+- Add production observability before public deployment.
 - Split frontend chunks if production bundle size becomes an issue.

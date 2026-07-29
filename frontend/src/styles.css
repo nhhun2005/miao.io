@@ -373,23 +373,6 @@ input {
   left: 1rem;
 }
 
-.grid-debug-toggle {
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: var(--radius-sm);
-  background: rgba(0, 0, 0, 0.55);
-  color: var(--color-text);
-  cursor: pointer;
-  font-size: 0.8rem;
-  font-weight: 700;
-  min-width: 7.5rem;
-  padding: 0.55rem 0.75rem;
-}
-
-.grid-debug-toggle--active {
-  border-color: rgba(132, 204, 22, 0.75);
-  color: var(--color-accent);
-}
-
 .game-hud,
 .leaderboard-panel,
 .game-status-panel,

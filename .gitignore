@@ -15,12 +15,20 @@ frontend/node_modules/
 frontend/dist/
 frontend/.vite/
 frontend/node_modules/.tmp/
+frontend/test-results/
+frontend/playwright-report/
+frontend/coverage/
 
 # Backend
 backend/target/
+backend/coverage/
+backend/site/
 backend/.mvn/wrapper/maven-wrapper.jar
 
 # Environment
 .env
 .env.*
 !.env.example
+
+# Temporary load-test output
+load-test-output*.json

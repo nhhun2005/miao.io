@@ -104,8 +104,7 @@ class OutboundMessageSerializationTest {
                 List.of(new SnapshotMessage.LeaderboardEntry("Alice", 0.0)),
                 List.of(new SnapshotMessage.FoodPickupData("f1", "berry", 300.0, 400.0, 5, "p1")),
                 List.of(new SnapshotMessage.KillEventData("p2", "p1", "Alice", 100.0, 200.0, 75.0)),
-                List.of(new SnapshotMessage.DashEventData("p1", 100.0, 200.0, 0.0)),
-                null
+                List.of(new SnapshotMessage.DashEventData("p1", 100.0, 200.0, 0.0))
         );
         Map<String, Object> map = msg.toMap();
 
