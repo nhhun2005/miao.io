@@ -2,6 +2,10 @@
 
 Mimope is a browser-based `mope.io`-style multiplayer game foundation using React, PixiJS, TypeScript, and Spring Boot.
 
+The current as-built architecture, class catalogue, application flows,
+gameplay mechanics, use cases, and editable draw.io diagrams are documented in
+[`docs/SYSTEM_DOCUMENTATION.md`](docs/SYSTEM_DOCUMENTATION.md).
+
 ## Repository Layout
 
 ```text

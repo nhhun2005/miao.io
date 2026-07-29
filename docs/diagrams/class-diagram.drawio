@@ -1,0 +1,67 @@
+<mxfile host="app.diagrams.net" modified="2026-07-29T16:00:00.000Z" agent="Codex" version="24.7.17" type="device" compressed="false">
+  <diagram id="class-diagram" name="Class Diagram">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Mimope.io — As-built Class / Module Diagram" style="text;html=1;fontSize=24;fontStyle=1;align=center;" vertex="1" parent="1"><mxGeometry x="400" y="20" width="800" height="40" as="geometry"/></mxCell>
+        <mxCell id="client" value="CLIENT — React / TypeScript / PixiJS" style="swimlane;html=1;rounded=1;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="30" y="80" width="760" height="960" as="geometry"/></mxCell>
+        <mxCell id="server" value="SERVER — Spring Boot / Java" style="swimlane;html=1;rounded=1;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="820" y="80" width="790" height="960" as="geometry"/></mxCell>
+
+        <mxCell id="app" value="App&#xa;screen router" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="client"><mxGeometry x="25" y="55" width="130" height="60" as="geometry"/></mxCell>
+        <mxCell id="screens" value="Screens&#xa;Home | Loading | Game | Death" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="client"><mxGeometry x="190" y="55" width="210" height="60" as="geometry"/></mxCell>
+        <mxCell id="uiStore" value="uiStore&#xa;screen, nickname, error, death" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="client"><mxGeometry x="440" y="55" width="190" height="60" as="geometry"/></mxCell>
+        <mxCell id="gameStore" value="gameStore&#xa;players, foods, leaderboard, tick" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="client"><mxGeometry x="440" y="145" width="190" height="70" as="geometry"/></mxCell>
+        <mxCell id="connection" value="GameConnection&#xa;+ connect/join/sendInput/sendEvolve&#xa;+ ping/reconnect/dispatch" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="client"><mxGeometry x="190" y="145" width="210" height="90" as="geometry"/></mxCell>
+        <mxCell id="protocol" value="protocol.ts&#xa;DTO + builders + runtime parser" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="client"><mxGeometry x="25" y="160" width="130" height="70" as="geometry"/></mxCell>
+        <mxCell id="canvas" value="GameCanvas&#xa;React–Pixi lifecycle bridge" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="client"><mxGeometry x="190" y="285" width="210" height="60" as="geometry"/></mxCell>
+        <mxCell id="pixi" value="PixiGame&#xa;layers, assets, sprites, camera&#xa;interpolation, effects, contours" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="client"><mxGeometry x="190" y="390" width="210" height="100" as="geometry"/></mxCell>
+        <mxCell id="input" value="InputManager&#xa;pointer/touch/keys&#xa;20 Hz sequenced input" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;" vertex="1" parent="client"><mxGeometry x="25" y="405" width="130" height="80" as="geometry"/></mxCell>
+        <mxCell id="data" value="Client registries&#xa;ANIMALS / FOODS / assets" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="client"><mxGeometry x="440" y="405" width="190" height="70" as="geometry"/></mxCell>
+        <mxCell id="ui" value="UI primitives&#xa;Button | Panel | Modal | ErrorBanner" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="client"><mxGeometry x="190" y="545" width="210" height="70" as="geometry"/></mxCell>
+
+        <mxCell id="wsconfig" value="WebSocketConfig + Properties&#xa;/ws + origin allowlist" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;" vertex="1" parent="server"><mxGeometry x="25" y="55" width="190" height="65" as="geometry"/></mxCell>
+        <mxCell id="handler" value="GameWebSocketHandler&#xa;socket lifecycle + dispatch" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="server"><mxGeometry x="265" y="55" width="200" height="65" as="geometry"/></mxCell>
+        <mxCell id="session" value="SessionRegistry&#xa;1 → * ClientSession" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;" vertex="1" parent="server"><mxGeometry x="515" y="55" width="180" height="65" as="geometry"/></mxCell>
+        <mxCell id="codec" value="MessageDecoder / Encoder&#xa;NicknameValidator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="server"><mxGeometry x="265" y="155" width="200" height="65" as="geometry"/></mxCell>
+        <mxCell id="room" value="GameRoom&#xa;room lifecycle, commands, snapshots" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="server"><mxGeometry x="265" y="265" width="200" height="75" as="geometry"/></mxCell>
+        <mxCell id="loop" value="GameLoop&#xa;fixed-rate authoritative thread" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;" vertex="1" parent="server"><mxGeometry x="25" y="275" width="190" height="65" as="geometry"/></mxCell>
+        <mxCell id="metrics" value="SnapshotMetrics" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="server"><mxGeometry x="515" y="275" width="180" height="50" as="geometry"/></mxCell>
+        <mxCell id="world" value="GameWorld&#xa;authoritative aggregate / orchestrator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" vertex="1" parent="server"><mxGeometry x="265" y="390" width="200" height="75" as="geometry"/></mxCell>
+        <mxCell id="commands" value="GameCommandQueue&#xa;Join | Remove | Evolve&#xa;ForceKill | GrantXp" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="server"><mxGeometry x="25" y="385" width="190" height="85" as="geometry"/></mxCell>
+        <mxCell id="entities" value="PlayerEntity&#xa;FoodEntity" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;" vertex="1" parent="server"><mxGeometry x="515" y="395" width="180" height="65" as="geometry"/></mxCell>
+        <mxCell id="systems" value="Systems&#xa;Movement | Water | HealthRegen&#xa;FoodCollision | Predation | Evolution" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="server"><mxGeometry x="25" y="525" width="230" height="105" as="geometry"/></mxCell>
+        <mxCell id="grid" value="SpatialGrid&#xa;viewport + collision queries" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;" vertex="1" parent="server"><mxGeometry x="295" y="540" width="170" height="70" as="geometry"/></mxCell>
+        <mxCell id="spawn" value="FoodSpawnService&#xa;weighted biome spawn" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;" vertex="1" parent="server"><mxGeometry x="515" y="540" width="180" height="70" as="geometry"/></mxCell>
+        <mxCell id="events" value="WorldEventBuffer&#xa;Pickup | Death | Dash | Evolution" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="server"><mxGeometry x="25" y="685" width="230" height="75" as="geometry"/></mxCell>
+        <mxCell id="registry" value="Definitions&#xa;AnimalDefinition | FoodDefinition | Biome" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="server"><mxGeometry x="295" y="685" width="220" height="75" as="geometry"/></mxCell>
+        <mxCell id="dto" value="Protocol records&#xa;Inbound + Outbound DTOs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="server"><mxGeometry x="555" y="685" width="140" height="75" as="geometry"/></mxCell>
+
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=1;" edge="1" parent="client" source="app" target="screens"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=1;" edge="1" parent="client" source="screens" target="uiStore"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=1;" edge="1" parent="client" source="screens" target="connection"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=1;" edge="1" parent="client" source="connection" target="protocol"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=1;" edge="1" parent="client" source="connection" target="gameStore"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=1;" edge="1" parent="client" source="canvas" target="pixi"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=1;" edge="1" parent="client" source="pixi" target="input"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=1;" edge="1" parent="client" source="pixi" target="data"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e9" value="WebSocket JSON v2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;startArrow=block;html=1;strokeWidth=2;" edge="1" parent="1" source="connection" target="handler"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=1;" edge="1" parent="server" source="wsconfig" target="handler"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=1;" edge="1" parent="server" source="handler" target="session"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=1;" edge="1" parent="server" source="handler" target="codec"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=1;" edge="1" parent="server" source="handler" target="room"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=diamond;html=1;" edge="1" parent="server" source="room" target="loop"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=diamond;html=1;" edge="1" parent="server" source="room" target="world"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e16" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=1;" edge="1" parent="server" source="room" target="metrics"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=diamond;html=1;" edge="1" parent="server" source="world" target="commands"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e18" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=diamond;html=1;" edge="1" parent="server" source="world" target="entities"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=1;" edge="1" parent="server" source="world" target="systems"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e20" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=1;" edge="1" parent="server" source="world" target="grid"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=1;" edge="1" parent="server" source="world" target="spawn"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e22" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=1;" edge="1" parent="server" source="world" target="events"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e23" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=1;" edge="1" parent="server" source="entities" target="registry"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e24" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=open;html=1;" edge="1" parent="server" source="room" target="dto"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

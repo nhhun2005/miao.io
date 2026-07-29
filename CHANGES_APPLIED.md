@@ -1,5 +1,9 @@
 # Changes Applied
 
+- Added comprehensive as-built system documentation covering the current
+  backend/frontend classes, application and tick flows, gameplay mechanisms,
+  techniques, security, deployment, testing, use cases, limitations, and four
+  editable draw.io diagrams (class, use case, application flow, tick activity).
 - Removed the coloured keylines baked into food textures at load time so
   edible food is genuinely borderless; inedible food still receives the
   renderer's black contour.

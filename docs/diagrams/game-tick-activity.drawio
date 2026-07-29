@@ -1,0 +1,38 @@
+<mxfile host="app.diagrams.net" modified="2026-07-29T16:00:00.000Z" agent="Codex" version="24.7.17" type="device" compressed="false">
+  <diagram id="tick-activity" name="Game Tick Activity">
+    <mxGraphModel dx="1200" dy="1200" grid="1" gridSize="10" page="1" pageScale="1" pageWidth="1200" pageHeight="1400">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Mimope.io — Activity Diagram of One Authoritative Tick" style="text;html=1;fontSize=24;fontStyle=1;align=center;" vertex="1" parent="1"><mxGeometry x="200" y="20" width="800" height="40" as="geometry"/></mxCell>
+        <mxCell id="start" value="" style="ellipse;html=1;aspect=fixed;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1"><mxGeometry x="580" y="80" width="30" height="30" as="geometry"/></mxCell>
+        <mxCell id="tick" value="tick++ và clear event buffer của tick trước" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;" vertex="1" parent="1"><mxGeometry x="425" y="140" width="340" height="55" as="geometry"/></mxCell>
+        <mxCell id="cmd" value="Drain GameCommandQueue (FIFO)&#xa;Join / Remove / Evolve / test-support" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="425" y="225" width="340" height="65" as="geometry"/></mxCell>
+        <mxCell id="move" value="MovementSystem&#xa;consume latest input → dash → biome multiplier → clamp position" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="400" y="320" width="390" height="70" as="geometry"/></mxCell>
+        <mxCell id="water" value="WaterSystem&#xa;refill hoặc drain; dehydration có thể tạo DeathEvent" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="400" y="420" width="390" height="65" as="geometry"/></mxCell>
+        <mxCell id="regen" value="HealthRegenerationSystem&#xa;hồi máu nếu đủ thời gian không nhận damage" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="400" y="515" width="390" height="65" as="geometry"/></mxCell>
+        <mxCell id="grid1" value="Rebuild SpatialGrid #1&#xa;alive players + current foods" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="425" y="610" width="340" height="65" as="geometry"/></mxCell>
+        <mxCell id="food" value="FoodCollisionSystem&#xa;nearby query → tier/overlap → XP/water → remove + PickupEvent" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="385" y="705" width="420" height="70" as="geometry"/></mxCell>
+        <mxCell id="predation" value="PredationSystem&#xa;arc/collision/cooldown → bite → steal XP → deferred knockback/death" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="385" y="805" width="420" height="70" as="geometry"/></mxCell>
+        <mxCell id="evolve" value="EvolutionSystem&#xa;phát options một lần khi đủ XP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="425" y="905" width="340" height="60" as="geometry"/></mxCell>
+        <mxCell id="spawn" value="FoodSpawnService.replenishFood&#xa;weighted random theo biome đến maxFood" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="410" y="995" width="370" height="65" as="geometry"/></mxCell>
+        <mxCell id="grid2" value="Rebuild SpatialGrid #2&#xa;đảm bảo snapshot thấy food mới và removals" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="410" y="1090" width="370" height="65" as="geometry"/></mxCell>
+        <mxCell id="broadcast" value="GameRoom broadcast&#xa;evolution/death riêng + leaderboard + filtered snapshot/player" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1"><mxGeometry x="385" y="1185" width="420" height="70" as="geometry"/></mxCell>
+        <mxCell id="end" value="" style="ellipse;html=1;aspect=fixed;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1"><mxGeometry x="580" y="1290" width="30" height="30" as="geometry"/></mxCell>
+
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="start" target="tick"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="tick" target="cmd"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="cmd" target="move"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="move" target="water"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="water" target="regen"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="regen" target="grid1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="grid1" target="food"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="food" target="predation"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="predation" target="evolve"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e10" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="evolve" target="spawn"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="spawn" target="grid2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e12" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="grid2" target="broadcast"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e13" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;html=1;" edge="1" parent="1" source="broadcast" target="end"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
