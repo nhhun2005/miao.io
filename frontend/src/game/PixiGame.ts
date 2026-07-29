@@ -30,7 +30,6 @@ import {
   foodImageKey,
 } from './data/assets';
 import { InputManager } from './InputManager';
-import { useInputStore } from '../state/inputStore';
 import { useGameStore, type PlayerSnapshot, type FoodSnapshot } from '../state/gameStore';
 import type { GameConnection } from '../network/GameConnection';
 import type { SnapshotMessage } from '../network/protocol';
@@ -371,9 +370,6 @@ export class PixiGame {
       this.inputManager = null;
     }
 
-    // Reset input store
-    useInputStore.getState().reset();
-
     if (this.app) {
       this.safeDestroyApp();
     }
@@ -680,18 +676,6 @@ export class PixiGame {
       container: this.container,
       sendRate: 20,
       onInput: (snapshot) => {
-        // Sync to Zustand store for React HUD components
-        const offset = this.inputManager!.pointerOffset;
-        useInputStore.getState().syncFromInput({
-          angle: snapshot.angle,
-          intensity: snapshot.intensity,
-          dash: snapshot.dash,
-          seq: snapshot.seq,
-          focused: this.inputManager!.focused,
-          pointerX: offset.x,
-          pointerY: offset.y,
-        });
-
         // Send input to server via WebSocket
         this.connection.sendInput(
           snapshot.seq,

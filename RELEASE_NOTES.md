@@ -8,7 +8,7 @@
 - Land, ocean, and arctic biome visuals with biome-aware food spawning and movement modifiers.
 - Dash on left click (or Space/W) with a 1.5-second cooldown, a 5% drinking-water cost per dash (blocked below 10% water), and HUD state. Holding the control re-dashes automatically on every cooldown.
 - Drinking-water bar drains at 2% per second on dry land, but sea animals stranded out of water lose 25% per second and run dry in four seconds.
-- Leaderboard, minimap, health bar, XP bar, ping display, settings placeholder, and input/FPS development diagnostics.
+- Leaderboard, minimap, health bar, XP bar, ping display, and FPS diagnostics.
 
 ## Verification
 

@@ -1,5 +1,10 @@
 # Changes Applied
 
+- Removed the Input Debug panel and its now-unused Zustand input mirror,
+  renderer synchronization, React subscriptions, and CSS.
+- Removed the Settings placeholder, sound toggle state/assets, settings
+  controls, CSS, and stale documentation.
+
 - Removed the production `debug_levelup` command end-to-end: backend constants
   and handler logic, world mutation API, frontend message builder/connection
   method/control, tests, comments, and documentation.

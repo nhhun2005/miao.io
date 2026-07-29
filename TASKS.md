@@ -298,8 +298,6 @@ shares a single dash triggered by left-click (or Space / W).
 - [x] Add minimap.
 - [x] Add ping display.
 - [x] Add FPS display in development.
-- [x] Add settings panel.
-- [x] Add sound toggle placeholder.
 - [x] Add reconnecting state.
 - [x] Add clean disconnect handling.
 

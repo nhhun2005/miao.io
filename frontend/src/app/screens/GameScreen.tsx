@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useUIStore } from '../../state/uiStore';
-import { useInputStore } from '../../state/inputStore';
 import { useGameStore } from '../../state/gameStore';
 import { GameCanvas } from '../../game/GameCanvas';
 import { ANIMALS, getAnimalPreviewPath, getEvolutionOptions } from '../../game/data/animals';
@@ -15,12 +14,6 @@ import type { GameConnection } from '../../network/GameConnection';
 export function GameScreen() {
   const nickname = useUIStore((s) => s.nickname);
 
-  // Input debug state from InputManager → inputStore
-  const angle = useInputStore((s) => s.angle);
-  const intensity = useInputStore((s) => s.intensity);
-  const dash = useInputStore((s) => s.dash);
-  const seq = useInputStore((s) => s.seq);
-  const focused = useInputStore((s) => s.focused);
   const localPlayerId = useGameStore((s) => s.localPlayerId);
   const players = useGameStore((s) => s.players);
   const evolutionOptions = useGameStore((s) => s.evolutionOptions);
@@ -46,8 +39,6 @@ export function GameScreen() {
     };
   }, [connection]);
 
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
   const [latency, setLatency] = useState(0);
 
   useEffect(() => {
@@ -56,7 +47,6 @@ export function GameScreen() {
     return () => window.clearInterval(timer);
   }, [connection]);
 
-  const angleDeg = ((angle * 180) / Math.PI).toFixed(0);
   const localPlayer = localPlayerId ? players[localPlayerId] : null;
   const currentAnimal = localPlayer ? ANIMALS[localPlayer.animalId] : null;
   const nextEvolution = currentAnimal ? getEvolutionOptions(currentAnimal.id)[0] : null;
@@ -116,7 +106,6 @@ export function GameScreen() {
         </div>
       </div>
 
-      {/* Input debug overlay */}
       <div className="game-overlay game-overlay--top-right">
         <div className="leaderboard-panel">
           <div className="leaderboard-panel__title">Leaderboard</div>
@@ -149,61 +138,7 @@ export function GameScreen() {
         <div className="game-status-panel">
           <span>Ping {latency || '--'}ms</span>
           <span>{connection.connectionState}</span>
-          <button type="button" onClick={() => setSettingsOpen((v) => !v)}>Settings</button>
         </div>
-        {settingsOpen && (
-          <div className="settings-panel">
-            <label className="settings-panel__toggle">
-              <input
-                type="checkbox"
-                checked={soundEnabled}
-                onChange={(e) => setSoundEnabled(e.target.checked)}
-              />
-              Sound
-            </label>
-            <div className="settings-panel__section">
-              <div className="settings-panel__title">Controls</div>
-              <div className="settings-panel__row">
-                <span>Move</span>
-                <strong>Mouse pointer</strong>
-              </div>
-              <div className="settings-panel__row">
-                <span>Dash</span>
-                <strong>Left click / Space / W</strong>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="game-overlay game-overlay--debug">
-        <details className="game-debug-panel">
-          <summary className="game-debug-panel__title">Input Debug</summary>
-          <div className="game-debug-panel__row">
-            <span>Angle:</span>
-            <span>{angleDeg}°</span>
-          </div>
-          <div className="game-debug-panel__row">
-            <span>Intensity:</span>
-            <span>{(intensity * 100).toFixed(0)}%</span>
-          </div>
-          <div className="game-debug-panel__row">
-            <span>Dash:</span>
-            <span className={dash ? 'game-debug-panel__active' : ''}>
-              {dash ? '⚡ DASH' : 'ready'}
-            </span>
-          </div>
-          <div className="game-debug-panel__row">
-            <span>Seq:</span>
-            <span>{seq}</span>
-          </div>
-          <div className="game-debug-panel__row">
-            <span>Focus:</span>
-            <span className={!focused ? 'game-debug-panel__warn' : ''}>
-              {focused ? '✅' : '⏸ paused'}
-            </span>
-          </div>
-        </details>
       </div>
 
       <Modal open={evolutionOptions.length > 0}>

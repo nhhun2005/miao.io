@@ -38,9 +38,6 @@ export function foodEdibleKey(foodId: string): string {
 
 export const UI_ASSETS = {
   logo: 'img/logo.png',
-  settings: 'img/settings.png',
-  soundOn: 'img/sound_on.png',
-  soundOff: 'img/sound_off.png',
   close: 'img/x.png',
   eatSymbol: 'img/instr_eatsymbol.png',
 } as const;

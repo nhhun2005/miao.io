@@ -100,7 +100,7 @@ Recommended migration:
 
 ### 3.1 Technology Choices
 
-- **ReactJS:** Menus, HUD, overlays, settings, loading screens.
+- **ReactJS:** Menus, HUD, overlays, and loading screens.
 - **PixiJS:** High-performance 2D rendering canvas.
 - **TypeScript:** Shared type safety for client-side game models.
 - **Vite:** Fast dev server and production build.
@@ -153,8 +153,7 @@ frontend/src/
 │   └── protocol.ts
 ├── state/
 │   ├── gameStore.ts
-│   ├── uiStore.ts
-│   └── inputStore.ts
+│   └── uiStore.ts
 ├── config/
 │   └── env.ts
 ├── styles.css
@@ -169,7 +168,6 @@ React should own:
 - Menus
 - HUD
 - Modals
-- Settings
 - Connection state
 
 PixiJS should own:
