@@ -1,5 +1,17 @@
 # Changes Applied
 
+- Removed the coloured keylines baked into food textures at load time so
+  edible food is genuinely borderless; inedible food still receives the
+  renderer's black contour.
+- Changed the movement penalty outside an animal's native biome to `0.85x`;
+  native-biome and final-tier movement remain at full speed.
+- Changed food contours so inedible items have a solid black outline and
+  edible items have no outline, while preserving all player outline styling.
+- Moved the in-game stats HUD below the Pixi FPS label so the two overlays no
+  longer overlap.
+- Rebuilt the nickname screen around a single `Mimope.io` wordmark, removing
+  the legacy image logo and adding a polished responsive layout, clearer form
+  hierarchy, nickname counter, starter selection states, and stronger CTA.
 - Removed the Input Debug panel and its now-unused Zustand input mirror,
   renderer synchronization, React subscriptions, and CSS.
 - Removed the Settings placeholder, sound toggle state/assets, settings

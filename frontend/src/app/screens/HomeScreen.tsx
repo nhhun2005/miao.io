@@ -41,51 +41,65 @@ export function HomeScreen() {
 
   return (
     <div className="screen screen--home">
+      <div className="home-backdrop" aria-hidden="true">
+        <span className="home-backdrop__orb home-backdrop__orb--one" />
+        <span className="home-backdrop__orb home-backdrop__orb--two" />
+        <span className="home-backdrop__leaf">✦</span>
+      </div>
       <Panel className="home-panel">
-        <img
-          src="/img/logo.png"
-          alt="Mimope"
-          className="home-panel__logo"
-          onError={(e) => {
-            // Hide broken image if logo asset is missing
-            (e.target as HTMLImageElement).style.display = "none";
-          }}
-        />
-        <h1 className="home-panel__title">Mimope</h1>
+        <div className="home-panel__brand">
+          <span className="home-panel__eyebrow">Eat · Grow · Evolve</span>
+          <h1 className="home-panel__title">
+            Mimope<span>.io</span>
+          </h1>
+        </div>
         <p className="home-panel__subtitle">
-          A multiplayer animal evolution game
+          Enter a wild multiplayer world, find food and evolve to the top.
         </p>
 
         <label className="home-panel__label">
-          Nickname
-          <input
-            className="home-panel__input"
-            type="text"
-            value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Enter your name…"
-            maxLength={MAX_NICKNAME_LENGTH}
-            autoFocus
-          />
+          <span>Choose your name</span>
+          <div className="home-panel__input-wrap">
+            <input
+              className="home-panel__input"
+              type="text"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="What should we call you?"
+              maxLength={MAX_NICKNAME_LENGTH}
+              autoFocus
+            />
+            <small>{nickname.length}/{MAX_NICKNAME_LENGTH}</small>
+          </div>
         </label>
 
-        <div className="home-panel__starter-group" aria-label="Starter animal">
-          {STARTER_ANIMAL_IDS.map((animalId) => {
-            const animal = ANIMALS[animalId];
-            return (
-              <button
-                key={animalId}
-                type="button"
-                className={`home-panel__starter ${starterAnimalId === animalId ? "home-panel__starter--active" : ""}`}
-                onClick={() => setStarterAnimalId(animalId)}
-              >
-                <img src={`/${animal.skinPath}`} alt="" />
-                <span>{animal.name}</span>
-                <small>{animal.biome}</small>
-              </button>
-            );
-          })}
+        <div className="home-panel__starter-section">
+          <div className="home-panel__section-heading">
+            <span>Pick a starter</span>
+            <small>You can evolve later</small>
+          </div>
+          <div className="home-panel__starter-group" aria-label="Starter animal">
+            {STARTER_ANIMAL_IDS.map((animalId) => {
+              const animal = ANIMALS[animalId];
+              const selected = starterAnimalId === animalId;
+              return (
+                <button
+                  key={animalId}
+                  type="button"
+                  className={`home-panel__starter ${selected ? "home-panel__starter--active" : ""}`}
+                  onClick={() => setStarterAnimalId(animalId)}
+                  aria-pressed={selected}
+                >
+                  <span className="home-panel__starter-image">
+                    <img src={`/${animal.skinPath}`} alt="" />
+                  </span>
+                  <span>{animal.name}</span>
+                  <small>{animal.biome}</small>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <Button
@@ -94,11 +108,11 @@ export function HomeScreen() {
           disabled={!nicknameValid}
           onClick={handleStart}
         >
-          Play
+          Enter the wild
         </Button>
 
         <small className="home-panel__hint">
-          Enter a nickname and click Play to start!
+          Move with your pointer · Dash with click, Space or W
         </small>
       </Panel>
     </div>

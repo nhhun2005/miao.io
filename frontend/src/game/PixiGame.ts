@@ -95,30 +95,19 @@ interface OutlineStyleSpec {
 }
 
 /**
- * Contour looks, one per meaning. The semantics are unchanged — red marks a
- * higher-tier predator, green marks food this animal can eat — only the
- * rendering is gentler: "just so you can see it" ink (neutral creatures,
- * food that is out of reach) is a translucent slate rather than a hard
- * pure-black keyline, so the screen no longer reads like a colouring book,
- * and the two variants that actually demand attention are the only opaque,
- * slowly breathing ones.
+ * Contour looks, one per meaning. Player contours keep their threat/neutral
+ * styling. Food that cannot be eaten gets a solid black contour; edible food
+ * is rendered without a contour by {@link PixiGame.applyOutline}.
  */
 const OUTLINE_STYLES: Record<OutlineVariant, OutlineStyleSpec> = {
   /** Higher-tier opponent — a threat worth watching. */
   threat: { color: 0xff5a5a, alpha: 1, pen: 2.6, quality: 0.55, pulseDepth: 0.3, pulsePeriod: 1.15 },
   /** Same/lower tier opponent or the local player. */
   neutral: { color: 0x16213a, alpha: 0.55, pen: 1.8, quality: 0.55 },
-  /** Food this player's tier can eat. */
-  edible: {
-    color: 0x2fd46a,
-    alpha: 0.95,
-    pen: 1.6,
-    quality: 0.45,
-    pulseDepth: 0.16,
-    pulsePeriod: 1.8,
-  },
+  /** Food this player's tier can eat (the filter is intentionally not applied). */
+  edible: { color: 0x000000, alpha: 0, pen: 1.2, quality: 0.45 },
   /** Food this player's tier cannot eat yet. */
-  inedible: { color: 0x16213a, alpha: 0.5, pen: 1.2, quality: 0.45 },
+  inedible: { color: 0x000000, alpha: 1, pen: 1.2, quality: 0.45 },
 };
 
 /**
@@ -260,6 +249,8 @@ export class PixiGame {
   private playerSprites: Map<string, PlayerRenderState> = new Map();
   private foodSprites: Map<string, FoodRenderState> = new Map();
   private foodSpritePool: Sprite[] = [];
+  /** Borderless copies of food artwork; edibility contours are added in code. */
+  private foodTextures: Map<string, Texture> = new Map();
 
   /**
    * One shared OutlineFilter per contour variant. Sharing instances means a
@@ -381,6 +372,7 @@ export class PixiGame {
     this.playerSprites.clear();
     this.foodSprites.clear();
     this.foodSpritePool = [];
+    this.foodTextures.clear();
 
     // The contour filters are shared, so no sprite teardown released them.
     // Drop them explicitly, otherwise every game session leaks four shaders.
@@ -500,8 +492,68 @@ export class PixiGame {
 
     try {
       await Assets.load(keysToLoad);
+      this.prepareBorderlessFoodTextures();
     } catch (err) {
       console.warn('[PixiGame] Some assets failed to load:', err);
+    }
+  }
+
+  /**
+   * The source food PNGs include a coloured keyline in their pixels. Strip
+   * the outer alpha edge once at load time so the renderer is the sole source
+   * of edibility styling: edible food has no border and inedible food receives
+   * the black OutlineFilter below.
+   */
+  private prepareBorderlessFoodTextures(): void {
+    for (const foodId of Object.keys(FOODS)) {
+      const sourceTexture = Assets.get<Texture>(foodImageKey(foodId));
+      const resource = sourceTexture?.source.resource;
+      if (!sourceTexture || !(resource instanceof ImageBitmap || resource instanceof HTMLImageElement)) {
+        if (sourceTexture) this.foodTextures.set(foodId, sourceTexture);
+        continue;
+      }
+
+      const width = sourceTexture.width;
+      const height = sourceTexture.height;
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      if (!context) {
+        this.foodTextures.set(foodId, sourceTexture);
+        continue;
+      }
+
+      context.drawImage(resource, 0, 0, width, height);
+      const image = context.getImageData(0, 0, width, height);
+      const erosionPasses = Math.max(2, Math.min(10, Math.round(Math.min(width, height) * 0.04)));
+
+      for (let pass = 0; pass < erosionPasses; pass += 1) {
+        const alpha = new Uint8ClampedArray(width * height);
+        for (let i = 0; i < alpha.length; i += 1) alpha[i] = image.data[i * 4 + 3];
+
+        for (let y = 0; y < height; y += 1) {
+          for (let x = 0; x < width; x += 1) {
+            const index = y * width + x;
+            if (alpha[index] === 0) continue;
+
+            const touchesTransparency =
+              x === 0 ||
+              y === 0 ||
+              x === width - 1 ||
+              y === height - 1 ||
+              alpha[index - 1] === 0 ||
+              alpha[index + 1] === 0 ||
+              alpha[index - width] === 0 ||
+              alpha[index + width] === 0;
+
+            if (touchesTransparency) image.data[index * 4 + 3] = 0;
+          }
+        }
+      }
+
+      context.putImageData(image, 0, 0);
+      this.foodTextures.set(foodId, Texture.from(canvas));
     }
   }
 
@@ -543,8 +595,8 @@ export class PixiGame {
   /**
    * Re-weight the shared contours once per frame: convert each world-space pen
    * width into the device pixels the shader expects, and breathe the two
-   * attention-seeking variants so a predator ring and edible food read as
-   * alive rather than as a flat sticker.
+   * attention-seeking player variants so a predator ring reads as alive
+   * rather than as a flat sticker.
    */
   private updateOutlineStyles(dt: number): void {
     this.outlinePulseTime += dt;
@@ -579,7 +631,7 @@ export class PixiGame {
    * call it when the meaning changes, not every frame.
    */
   private applyOutline(sprite: Sprite, variant: OutlineVariant): void {
-    sprite.filters = this.outlineFilters[variant];
+    sprite.filters = variant === 'edible' ? [] : [this.outlineFilters[variant]];
   }
 
   // -----------------------------------------------------------------------
@@ -974,7 +1026,7 @@ export class PixiGame {
       }
     }
 
-    // Refresh edible/non-edible borders based on the local player's tier.
+    // Refresh edible/non-edible contour state based on the local player's tier.
     this.updateFoodBorders();
   }
 
@@ -991,9 +1043,9 @@ export class PixiGame {
   }
 
   /**
-   * Re-dress each food item's shape-following contour: a bright green ring
-   * when the local player's tier is high enough to eat it, a faint slate one
-   * when it cannot be eaten yet.
+   * Re-dress each food item's shape-following contour: no contour when the
+   * local player's tier is high enough to eat it, a black contour when it
+   * cannot be eaten yet.
    */
   private updateFoodBorders(): void {
     const localTier = this.getLocalPlayerTier();
@@ -1017,8 +1069,7 @@ export class PixiGame {
   private createFoodSprite(f: FoodSnapshot): FoodRenderState {
     const foodDef = FOODS[f.foodId];
     const radius = foodDef?.radius ?? 8;
-    const key = foodImageKey(f.foodId);
-    const texture = Assets.get<Texture>(key);
+    const texture = this.foodTextures.get(f.foodId) ?? Assets.get<Texture>(foodImageKey(f.foodId));
 
     let sprite = this.foodSpritePool.pop();
     if (texture) {
@@ -1047,9 +1098,8 @@ export class PixiGame {
     sprite.height = radius * 2;
     sprite.position.set(f.x, f.y);
 
-    // Shape-following edibility contour applied directly to the food sprite.
-    // updateFoodBorders (called right after every snapshot) upgrades it to the
-    // green ring when the local player's tier can eat this item.
+    // Start with the non-edible black contour. updateFoodBorders (called right
+    // after every snapshot) removes it when the local player can eat the item.
     this.applyOutline(sprite, 'inedible');
 
     this.layerFood.addChild(sprite);

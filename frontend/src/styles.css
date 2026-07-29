@@ -73,12 +73,12 @@ input {
 
 /* Home screen gradient background */
 .screen--home {
-  background: radial-gradient(
-      circle at top,
-      rgba(132, 204, 22, 0.3),
-      transparent 32rem
-    ),
-    linear-gradient(135deg, #064e3b, #172554);
+  background:
+    radial-gradient(circle at 22% 15%, rgba(163, 230, 53, 0.2), transparent 25rem),
+    radial-gradient(circle at 82% 82%, rgba(56, 189, 248, 0.16), transparent 28rem),
+    linear-gradient(145deg, #052e2b 0%, #0f3d35 42%, #172554 100%);
+  isolation: isolate;
+  position: relative;
 }
 
 /* Loading screen */
@@ -120,44 +120,149 @@ input {
 }
 
 /* --- Home Panel -------------------------------------------- */
-.home-panel__logo {
-  max-width: 10rem;
-  width: 60%;
+.home-backdrop {
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
+}
+
+.home-backdrop::before,
+.home-backdrop::after {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 45%;
+  content: "";
+  height: 26rem;
+  position: absolute;
+  transform: rotate(25deg);
+  width: 26rem;
+}
+
+.home-backdrop::before {
+  left: -10rem;
+  top: 35%;
+}
+
+.home-backdrop::after {
+  right: -11rem;
+  top: -8rem;
+}
+
+.home-backdrop__orb {
+  border-radius: 50%;
+  filter: blur(3px);
+  position: absolute;
+}
+
+.home-backdrop__orb--one {
+  background: rgba(132, 204, 22, 0.13);
+  height: 18rem;
+  left: 8%;
+  top: -5rem;
+  width: 18rem;
+}
+
+.home-backdrop__orb--two {
+  background: rgba(14, 165, 233, 0.12);
+  bottom: -8rem;
+  height: 22rem;
+  right: 5%;
+  width: 22rem;
+}
+
+.home-backdrop__leaf {
+  color: rgba(190, 242, 100, 0.28);
+  font-size: 8rem;
+  left: calc(50% + 15rem);
+  position: absolute;
+  top: 12%;
+  transform: rotate(18deg);
+}
+
+.home-panel {
+  background: linear-gradient(155deg, rgba(15, 45, 39, 0.92), rgba(15, 23, 42, 0.88));
+  border-color: rgba(190, 242, 100, 0.24);
+  box-shadow:
+    0 2rem 6rem rgba(0, 0, 0, 0.42),
+    inset 0 1px rgba(255, 255, 255, 0.08);
+  gap: 1.15rem;
+  max-width: 31rem;
+  padding: 2rem 2.25rem 1.75rem;
+}
+
+.home-panel__brand {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.home-panel__eyebrow {
+  color: #bef264;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
 }
 
 .home-panel__title {
-  font-size: clamp(2.5rem, 8vw, 4rem);
-  line-height: 1;
+  font-size: clamp(3rem, 8vw, 4.6rem);
+  letter-spacing: -0.075em;
+  line-height: 0.9;
   margin: 0;
+  text-shadow: 0 0.45rem 1.4rem rgba(0, 0, 0, 0.28);
+}
+
+.home-panel__title span {
+  color: var(--color-accent);
 }
 
 .home-panel__subtitle {
-  color: #d9f99d;
+  color: #dbeafe;
+  font-size: 0.92rem;
+  line-height: 1.5;
   margin: 0;
+  max-width: 24rem;
 }
 
 .home-panel__label {
   display: grid;
-  gap: 0.4rem;
+  gap: 0.5rem;
   text-align: left;
   width: 100%;
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: 750;
+}
+
+.home-panel__input-wrap {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.96);
+  border: 2px solid transparent;
+  border-radius: var(--radius-pill);
+  display: flex;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.home-panel__input-wrap:focus-within {
+  border-color: rgba(163, 230, 53, 0.9);
+  box-shadow: 0 0 0 4px rgba(132, 204, 22, 0.18);
 }
 
 .home-panel__input {
+  background: transparent;
   border: 0;
-  border-radius: var(--radius-pill);
-  padding: 0.75rem 1rem;
-  font-size: 1rem;
-  background: rgba(255, 255, 255, 0.95);
   color: #1e293b;
+  flex: 1;
+  font-size: 1rem;
   outline: none;
-  transition: box-shadow 0.15s;
+  padding: 0.78rem 0.4rem 0.78rem 1rem;
+  width: 100%;
 }
 
-.home-panel__input:focus {
-  box-shadow: 0 0 0 3px rgba(132, 204, 22, 0.5);
+.home-panel__input-wrap small {
+  color: #64748b;
+  font-size: 0.7rem;
+  padding-right: 1rem;
 }
 
 .home-panel__input::placeholder {
@@ -165,8 +270,30 @@ input {
 }
 
 .home-panel__hint {
+  color: #bae6fd;
+  font-size: 0.75rem;
+}
+
+.home-panel__starter-section {
+  display: grid;
+  gap: 0.55rem;
+  width: 100%;
+}
+
+.home-panel__section-heading {
+  align-items: baseline;
+  display: flex;
+  justify-content: space-between;
+}
+
+.home-panel__section-heading > span {
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.home-panel__section-heading small {
   color: var(--color-text-muted);
-  font-size: 0.8rem;
+  font-size: 0.7rem;
 }
 
 .home-panel__starter-group {
@@ -180,25 +307,42 @@ input {
   align-items: center;
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: var(--radius-sm);
+  border-radius: 0.85rem;
   color: var(--color-text);
   cursor: pointer;
   display: grid;
   gap: 0.2rem;
   justify-items: center;
-  min-height: 5.7rem;
-  padding: 0.45rem;
+  min-height: 6.4rem;
+  padding: 0.5rem;
+  transition: background 0.16s, border-color 0.16s, transform 0.16s;
+}
+
+.home-panel__starter:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
 }
 
 .home-panel__starter--active {
+  background: linear-gradient(180deg, rgba(132, 204, 22, 0.22), rgba(132, 204, 22, 0.08));
   border-color: rgba(132, 204, 22, 0.85);
   box-shadow: 0 0 0 2px rgba(132, 204, 22, 0.22);
 }
 
+.home-panel__starter-image {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  display: flex;
+  height: 3rem;
+  justify-content: center;
+  width: 3rem;
+}
+
 .home-panel__starter img {
-  height: 2.25rem;
+  height: 2.4rem;
   object-fit: contain;
-  width: 2.25rem;
+  width: 2.4rem;
 }
 
 .home-panel__starter span {
@@ -338,7 +482,7 @@ input {
 }
 
 .game-overlay--top-left {
-  top: 1rem;
+  top: 3rem;
   left: 1rem;
 }
 
@@ -706,13 +850,31 @@ input {
 
 /* --- Responsive -------------------------------------------- */
 @media (max-width: 480px) {
+  .screen--home {
+    align-items: flex-start;
+    overflow-y: auto;
+    padding-block: 1rem;
+  }
+
   .panel {
     padding: 1.5rem 1.25rem;
     border-radius: var(--radius-md);
   }
 
+  .home-panel {
+    gap: 0.9rem;
+  }
+
   .home-panel__title {
-    font-size: 2rem;
+    font-size: 3rem;
+  }
+
+  .home-panel__section-heading small {
+    display: none;
+  }
+
+  .home-panel__starter {
+    min-height: 5.8rem;
   }
 
   .btn {

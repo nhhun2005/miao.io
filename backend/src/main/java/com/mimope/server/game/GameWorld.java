@@ -696,7 +696,7 @@ public class GameWorld {
         if (animal.biome() == Biome.FINAL || currentBiome == Biome.FINAL) {
             return 1.0;
         }
-        return animal.biome() == currentBiome ? 1.0 : 0.75;
+        return animal.biome() == currentBiome ? 1.0 : 0.85;
     }
 
     private static double randomRange(double min, double max) {

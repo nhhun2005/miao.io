@@ -514,9 +514,9 @@ class GameWorldTest {
     @Test
     void movementMultiplierComparesAnimalLaneWithCurrentBiome() {
         assertEquals(1.0, world.movementMultiplierFor(AnimalDefinition.byId("shark"), Biome.OCEAN));
-        assertEquals(0.75, world.movementMultiplierFor(AnimalDefinition.byId("shark"), Biome.LAND));
+        assertEquals(0.85, world.movementMultiplierFor(AnimalDefinition.byId("shark"), Biome.LAND));
         assertEquals(1.0, world.movementMultiplierFor(AnimalDefinition.byId("mammoth"), Biome.ARCTIC));
-        assertEquals(0.75, world.movementMultiplierFor(AnimalDefinition.byId("mammoth"), Biome.OCEAN));
+        assertEquals(0.85, world.movementMultiplierFor(AnimalDefinition.byId("mammoth"), Biome.OCEAN));
         assertEquals(1.0, world.movementMultiplierFor(AnimalDefinition.byId("blackdragon"), Biome.LAND));
         assertEquals(1.0, world.movementMultiplierFor(AnimalDefinition.byId("blackdragon"), Biome.OCEAN));
         assertEquals(1.0, world.movementMultiplierFor(AnimalDefinition.byId("blackdragon"), Biome.ARCTIC));
