@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useUIStore } from '../../state/uiStore';
 import { useGameStore } from '../../state/gameStore';
 import { GameCanvas } from '../../game/GameCanvas';
@@ -19,6 +19,7 @@ export function GameScreen() {
   const evolutionOptions = useGameStore((s) => s.evolutionOptions);
   const clearEvolutionOptions = useGameStore((s) => s.clearEvolutionOptions);
   const leaderboard = useGameStore((s) => s.leaderboard);
+  const evolutionRequestPending = useRef(false);
 
   const [connection] = useState<GameConnection | null>(() => {
     const win = window as unknown as Record<string, unknown>;
@@ -46,6 +47,12 @@ export function GameScreen() {
     const timer = window.setInterval(() => setLatency(connection.latency), 500);
     return () => window.clearInterval(timer);
   }, [connection]);
+
+  useEffect(() => {
+    if (evolutionOptions.length > 0) {
+      evolutionRequestPending.current = false;
+    }
+  }, [evolutionOptions]);
 
   const localPlayer = localPlayerId ? players[localPlayerId] : null;
   const currentAnimal = localPlayer ? ANIMALS[localPlayer.animalId] : null;
@@ -154,7 +161,14 @@ export function GameScreen() {
                 <button
                   key={option.animalId}
                   className="evolution-card"
-                  onClick={() => {
+                  onClick={(event) => {
+                    // A rapid double-click can otherwise enqueue the same
+                    // evolution twice before React has removed the modal.
+                    // The second request arrives after the first one changed
+                    // the animal and is then (misleadingly) rejected.
+                    if (evolutionRequestPending.current) return;
+                    evolutionRequestPending.current = true;
+                    event.currentTarget.disabled = true;
                     connection.sendEvolve(option.animalId);
                     clearEvolutionOptions();
                   }}

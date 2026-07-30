@@ -404,6 +404,39 @@ class GameWorldTest {
     }
 
     @Test
+    void duplicateEvolutionRequestIsIdempotent() {
+        PlayerEntity player = world.spawnPlayer("p1", "Alice");
+        player.setAnimal(AnimalDefinition.byId("pig"));
+        player.setXp(1_000);
+
+        assertTrue(world.evolvePlayer(player.getId(), "squid").success());
+        GameWorld.EvolutionResult duplicate = world.evolvePlayer(player.getId(), "squid");
+
+        assertTrue(duplicate.success());
+        assertEquals("squid", player.getAnimal().id());
+    }
+
+    @Test
+    void everyNormalEvolutionOptionCanBeSelectedAtItsThreshold() {
+        for (AnimalDefinition current : AnimalDefinition.all().values()) {
+            for (AnimalDefinition target : current.evolutionOptions()) {
+                GameWorld isolatedWorld = new GameWorld(WIDTH, HEIGHT, MAX_FOOD);
+                PlayerEntity player = isolatedWorld.spawnPlayer(
+                        "player-" + current.id() + "-" + target.id(), "Alice");
+                player.setAnimal(current);
+                player.setXp(target.xpRequired());
+
+                GameWorld.EvolutionResult result =
+                        isolatedWorld.evolvePlayer(player.getId(), target.id());
+
+                assertTrue(result.success(),
+                        () -> current.id() + " -> " + target.id() + " should be available");
+                assertEquals(target.id(), player.getAnimal().id());
+            }
+        }
+    }
+
+    @Test
     void evolvePlayerRelocatesToTargetAnimalBiome() {
         PlayerEntity player = world.spawnPlayer("p1", "Alice", "shrimp");
         player.addXp(50);

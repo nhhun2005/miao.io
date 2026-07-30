@@ -560,6 +560,14 @@ public class GameWorld {
             return EvolutionResult.failure("Unknown animal: " + animalId);
         }
 
+        // Treat a duplicate request as an idempotent success. WebSocket
+        // messages can be submitted twice by a rapid double-click; after the
+        // first request succeeds, rejecting the second one as unavailable
+        // surfaces a false error even though the requested evolution happened.
+        if (player.getAnimal().id().equals(target.id())) {
+            return EvolutionResult.success(player);
+        }
+
         if (!player.canEvolveTo(target)) {
             return EvolutionResult.failure("Evolution is not available yet.");
         }
