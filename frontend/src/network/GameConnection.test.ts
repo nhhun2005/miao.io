@@ -208,5 +208,46 @@ describe('GameConnection reconnect logic', () => {
     vi.advanceTimersByTime(5000);
     expect(MockWebSocket.instances).toHaveLength(1);
   });
-});
 
+  it('coalesces burst input so one connection never sends above 20 Hz', () => {
+    const conn = new GameConnection();
+    const ws = connectAndJoin(conn);
+
+    conn.sendInput(1, 0.1, 1, false);
+    conn.sendInput(2, 0.2, 1, true);
+    conn.sendInput(3, 0.3, 1, false);
+
+    const inputs = () => ws.sent
+      .map((raw) => JSON.parse(raw))
+      .filter((message) => message.type === 'input');
+
+    expect(inputs()).toHaveLength(1);
+
+    vi.advanceTimersByTime(49);
+    expect(inputs()).toHaveLength(1);
+
+    vi.advanceTimersByTime(1);
+    expect(inputs()).toHaveLength(2);
+    expect(inputs()[1]).toMatchObject({
+      seq: 3,
+      angle: 0.3,
+      intensity: 1,
+      dash: true,
+    });
+  });
+
+  it('drops queued input when the connection closes', () => {
+    const conn = new GameConnection();
+    const ws = connectAndJoin(conn);
+
+    conn.sendInput(1, 0, 1, false);
+    conn.sendInput(2, 1, 1, false);
+    ws.serverClose();
+    vi.advanceTimersByTime(50);
+
+    const inputs = ws.sent
+      .map((raw) => JSON.parse(raw))
+      .filter((message) => message.type === 'input');
+    expect(inputs).toHaveLength(1);
+  });
+});

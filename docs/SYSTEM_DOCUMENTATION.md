@@ -363,23 +363,20 @@ Theo đúng thứ tự trong `GameWorld.tick`:
 
 ## 7. Use cases hiện có
 
-| ID | Actor | Use case | Kết quả |
+Use case sản phẩm chỉ mô tả mục tiêu mà actor thực hiện trực tiếp. Chi tiết
+WebSocket/reconnect, thao tác nội bộ server và API hỗ trợ kiểm thử không phải
+use case chính.
+
+| ID | Actor | Use case cấp cao | Use case con/kết quả |
 |---|---|---|---|
-| UC-01 | Player | Chọn nickname và starter | Dữ liệu local sẵn sàng join |
-| UC-02 | Player | Kết nối/tham gia room | Server spawn trong biome starter |
-| UC-03 | Player | Điều khiển hướng/tốc độ | Server áp input ở tick kế |
-| UC-04 | Player | Dash | Burst nếu cooldown cho phép |
-| UC-05 | Player | Ăn food | Tăng XP, refill nước |
-| UC-06 | Player | Uống nước | Water bar refill trong nguồn nước |
-| UC-07 | Player | Săn/cắn đối thủ | Damage, steal XP, knockback hoặc kill |
-| UC-08 | Player | Counter-bite predator | Được cắn tại rear arc |
-| UC-09 | Player | Tiến hóa | Chọn sinh vật tier tiếp theo |
-| UC-10 | Player | Xem HUD/leaderboard/minimap | Quan sát trạng thái hiện tại |
-| UC-11 | Player | Tự reconnect | Khôi phục socket sau lỗi tạm thời |
-| UC-12 | Player | Chơi lại sau death | Tạo session/player mới |
-| UC-13 | Operator | Health check | Xác nhận backend sống |
-| UC-14 | Tester | Grant XP/force death | Hỗ trợ E2E dưới profile riêng |
-| UC-15 | Developer | Load/clean-clone validation | Đánh giá tải và reproducibility |
+| UC-01 | Player | Tham gia trò chơi | Bao gồm nhập nickname và chọn sinh vật khởi đầu |
+| UC-02 | Player | Điều khiển sinh vật | Bao gồm di chuyển; dash là hành vi mở rộng khi cooldown cho phép |
+| UC-03 | Player | Sinh tồn | Bao gồm ăn thức ăn và bổ sung nước |
+| UC-04 | Player | Chiến đấu với người chơi khác | Bao gồm cắn; phản công mở rộng khi player cấp thấp ở phía sau kẻ săn mồi |
+| UC-05 | Player | Tiến hóa | Chọn sinh vật hợp lệ ở tier tiếp theo |
+| UC-06 | Player | Theo dõi trạng thái trận đấu | Bao gồm HUD, bảng xếp hạng và bản đồ nhỏ |
+| UC-07 | Player | Chơi lại sau khi chết | Reset store và bắt đầu phiên join mới |
+| UC-08 | Operator | Kiểm tra trạng thái máy chủ | Xác nhận backend đang hoạt động |
 
 Ngoại lệ chính:
 
@@ -448,6 +445,14 @@ Các file draw.io có thể mở trực tiếp tại
 - [`diagrams/usecase-diagram.drawio`](diagrams/usecase-diagram.drawio): actor/use case.
 - [`diagrams/application-flowchart.drawio`](diagrams/application-flowchart.drawio): luồng end-to-end.
 - [`diagrams/game-tick-activity.drawio`](diagrams/game-tick-activity.drawio): activity của một tick.
+
+Các bản export nền trắng để chèn vào báo cáo:
+
+- `application-flowchart.{png,svg}`
+- `usecase-diagram.{png,svg}`
+- `game-tick-activity.{png,svg}`
+- `class-diagram-overview.{png,svg}`
+- `class-diagram-backend-core.{png,svg}`
 
 ## 12. Hạn chế và hướng mở rộng
 

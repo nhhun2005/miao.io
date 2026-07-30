@@ -49,6 +49,8 @@ export interface GameConnectionCallbacks {
 // ---------------------------------------------------------------------------
 
 export class GameConnection {
+  private static readonly INPUT_INTERVAL_MS = 50;
+
   private ws: WebSocket | null = null;
   private state: ConnectionState = 'disconnected';
   private callbacks: GameConnectionCallbacks;
@@ -61,6 +63,14 @@ export class GameConnection {
   private reconnectAttempts = 0;
   private readonly maxReconnectAttempts = 3;
   private died = false;
+  private lastInputSentAt = 0;
+  private pendingInput: {
+    seq: number;
+    angle: number;
+    intensity: number;
+    dash: boolean;
+  } | null = null;
+  private inputTimer: ReturnType<typeof setTimeout> | null = null;
 
 
   constructor(callbacks: GameConnectionCallbacks = {}) {
@@ -103,6 +113,7 @@ export class GameConnection {
   disconnect(): void {
     this.stopPing();
     this.stopReconnect();
+    this.stopPendingInput();
     if (this.ws) {
       this.ws.onopen = null;
       this.ws.onmessage = null;
@@ -124,7 +135,28 @@ export class GameConnection {
 
   /** Send an input message. */
   sendInput(seq: number, angle: number, intensity: number, dash: boolean): void {
-    this.send(createInputMessage(seq, angle, intensity, dash));
+    if (!this.isConnected) return;
+
+    const now = Date.now();
+    const elapsed = now - this.lastInputSentAt;
+    if (this.inputTimer === null && elapsed >= GameConnection.INPUT_INTERVAL_MS) {
+      this.sendInputNow(seq, angle, intensity, dash);
+      return;
+    }
+
+    // Keep only the newest movement state. A dash is edge-triggered, so retain
+    // it if any coalesced frame requested one.
+    this.pendingInput = {
+      seq,
+      angle,
+      intensity,
+      dash: dash || (this.pendingInput?.dash ?? false),
+    };
+
+    if (this.inputTimer === null) {
+      const delay = Math.max(0, GameConnection.INPUT_INTERVAL_MS - elapsed);
+      this.inputTimer = setTimeout(() => this.flushPendingInput(), delay);
+    }
   }
 
   /** Send an evolve request. */
@@ -290,6 +322,29 @@ export class GameConnection {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(msg));
     }
+  }
+
+  private sendInputNow(seq: number, angle: number, intensity: number, dash: boolean): void {
+    this.lastInputSentAt = Date.now();
+    this.send(createInputMessage(seq, angle, intensity, dash));
+  }
+
+  private flushPendingInput(): void {
+    this.inputTimer = null;
+    const input = this.pendingInput;
+    this.pendingInput = null;
+    if (!input || !this.isConnected) return;
+
+    this.sendInputNow(input.seq, input.angle, input.intensity, input.dash);
+  }
+
+  private stopPendingInput(): void {
+    if (this.inputTimer !== null) {
+      clearTimeout(this.inputTimer);
+      this.inputTimer = null;
+    }
+    this.pendingInput = null;
+    this.lastInputSentAt = 0;
   }
 
   private setState(state: ConnectionState): void {
